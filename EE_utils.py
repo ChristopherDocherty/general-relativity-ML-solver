@@ -7,27 +7,75 @@ import data_visualisation
 
 one_tensor = tf.Variable([1.0])
 
-scaling_factors = [100.0, 1e7, 2*np.pi, np.pi]
+### larger star ###
+#scaling_factors = [100.0, 1e7, 2*np.pi, np.pi]
+#M_sol = 1.5e3 
+#scaling_factors = [100.0, 1e7, 2*np.pi, np.pi]
 
+### Teeny star ###
+scaling_factors = [100.0, 1e2, 2*np.pi, np.pi]
+M_sol = 1.5e-2 
+R_sol = 7 
 
-M_sol = 1.5e3
-R_sol = 7e5
 
 rho = M_sol/(4/3 * math.pi * R_sol**3)
 
-def T(coords):
 
-    return tf.constant([
+def transform_metric(output, from_model=False):
+
+    if from_model:
+        return  1 - output/1000
+    else:
+        return 1000 * (1 - output)
+
+#    if from_model:
+#        return tf.math.log(output) 
+#    else:
+#        return tf.math.exp(output) 
+
+
+BC_data = None
+def get_BC_data(batch_size):
+
+
+    t = np.reshape(np.random.random(batch_size),(-1,1))
+    r = np.reshape(np.repeat(np.array(8e-2),batch_size),(-1,1))
+    th = np.reshape(np.random.random(batch_size),(-1,1))
+    phi = np.reshape(np.random.random(batch_size),(-1,1))
+
+
+    coords_BC = np.concatenate((t,r,th,phi),1)
+    coords_BC = tf.convert_to_tensor(coords_BC, dtype=tf.float32)
+
+
+    metric_BC = get_true_metric(coords_BC)
+
+    return coords_BC, metric_BC 
+
+
+
+
+def T(coords, batch_size):
+    '''
+    come back and simplify this spaghetti code
+    '''
+
+    inside_mask_tensor = get_mask_function(inside=True, coords=coords)
+    inside_mask_tensor = tf.expand_dims(inside_mask_tensor,-1)
+    inside_mask_tensor = tf.expand_dims(inside_mask_tensor,-1)
+
+    inside_T = tf.convert_to_tensor(np.array([
         [rho, 0.0, 0.0, 0.0],
         [0.0, 0.0, 0.0, 0.0],
         [0.0, 0.0, 0.0, 0.0],
         [0.0, 0.0, 0.0, 0.0]
-    ])
+    ]) 
+    , dtype=tf.float32)
 
+    inside_T = tf.expand_dims(inside_T,0)
+    inside_T = tf.repeat(inside_T,batch_size, 0)
 
-
-def logit(x):
-    return tf.math.log(x / (1.0-x))
+    return inside_mask_tensor * inside_T
 
 
 
@@ -39,298 +87,75 @@ def get_einstein_tensor(contr_ricci_tensor, g_inv, ricci_scalar, dims):
     ricci_scalar = tf.repeat(ricci_scalar,[dims],1)
     ricci_scalar = tf.repeat(ricci_scalar,[dims],2)
 
+
     return contr_ricci_tensor - 0.5 * ricci_scalar * g_inv 
 
 
-def get_contravariant_ricci_tensor(ricci_tensor, g_inv, dims):
 
 
-    contr_ricci_tensor = []
 
-    for i in range(dims):
-        row = []
 
-        for j in range(dims):
 
-            contr_ricci_element = tf.zeros([1],tf.float32)
+##############################
+## Metric finding functions ##
+##############################
 
-            for k in range(dims):
-                for l in range(dims):
+def build_g_from_g_rr(g_rr, coords):
 
-                    contr_ricci_element += g_inv[:,i,k] * g_inv[:,j,l] * ricci_tensor[:,k,l]
+    inside_mask_tensor = get_mask_function(inside=True, coords=coords)
+    outside_mask_tensor = get_mask_function(inside=False, coords=coords) 
 
-            contr_ricci_element = tf.expand_dims(contr_ricci_element, 1)
-            row.append(contr_ricci_element)
 
-        row = tf.concat(row, 1)
-        row = tf.expand_dims(row, 1)
-        contr_ricci_tensor.append(row)
+    g_tt_inside = -(1.5 * tf.math.sqrt(1 - 2*M_sol/R_sol) - 0.5 * tf.math.sqrt(1 - 2*M_sol* (coords[:,1] * scaling_factors[1])**2 / R_sol**3))**2
+    g_tt_outside = - (1 - (2*M_sol / (coords[:,1]*scaling_factors[1])))
 
-    return tf.concat(contr_ricci_tensor, 1)
 
 
-def get_ricci_scalar(ricci_tensor, g_inv, dims):
+    g_tt =  tf.expand_dims(inside_mask_tensor * g_tt_inside + outside_mask_tensor * g_tt_outside, 1)
 
 
-    ricci_scalar = tf.zeros([1], tf.float32)
+    g_thth = tf.expand_dims((coords[:,1] * scaling_factors[1]) **2, 1)
+    g_pp = g_thth * tf.math.sin(tf.expand_dims((coords[:,2] * scaling_factors[2]), 1))**2 
 
-    for i in range(dims):
-        for j in range(dims):
-            ricci_scalar += g_inv[:, i,j] * ricci_tensor[:, i,j]
 
-    return ricci_scalar
-
-
-def get_ricci_tensor(reimann_tensor, dims):
-
-    matrix = []
-
-    for i in range(dims):
-
-        row = []
-
-        for j in range(dims):
-
-            ricci_element = tf.zeros([1],tf.float32)
-
-            for k in range(dims):
-
-                ricci_element += reimann_tensor[:,k,i,k,j]
-
-
-            ricci_element = tf.expand_dims(ricci_element,1)
-            row.append(ricci_element)
-
-        row = tf.concat(row, 1)
-        row = tf.expand_dims(row, 1)
-        matrix.append(row)
-
-    return tf.concat(matrix,1)
-
-
-def get_reimann_tensor(christof_tensor, christof_grads, dims):
-
-
-    big_tensor = []
-
-    for i in range(dims):
-        small_tensor = []
-
-        for j in range(dims):
-
-            matrix = []
-
-            for k in range(dims):
-
-                row = []
-
-                for l in range(dims):
-
-                    reimann_element = get_reimann_element((i,j,k,l), christof_tensor, christof_grads, dims)
-                    reimann_element = tf.expand_dims(reimann_element, 1)
-                    row.append(reimann_element) 
-
-                row = tf.concat(row, 1)
-                row = tf.expand_dims(row, 1)
-                matrix.append(row)
-
-            matrix = tf.concat(matrix, 1)
-            matrix = tf.expand_dims(matrix, 1)
-            small_tensor.append(matrix)
-
-        small_tensor = tf.concat(small_tensor, 1)
-        small_tensor = tf.expand_dims(small_tensor, 1)
-        big_tensor.append(small_tensor)
-
-    return tf.concat(big_tensor, 1)
-
-
-
-def get_reimann_element(indices, christof_tensor, christof_grads, dims):
-    '''
-        indices according to R^\mu_{\alpha \beta \gamma}
-    '''
-
-    mu, alpha, beta, gamma = indices
-
-
-    R = christof_grads[:, mu, alpha, gamma, beta]
-    R -= christof_grads[:, mu, alpha, beta, gamma]    
-
-    for sigma in range(dims):
-
-        R += christof_tensor[:, sigma, alpha, gamma] * christof_tensor[:, mu, sigma, beta]
-        R -= christof_tensor[:, sigma, alpha, beta] * christof_tensor[:, mu, sigma, gamma]
-
-    return R
-
-
-
-def get_christoffel_tensor(g_inv, grads, dims):
-
-    tensor = []
-
-    for i in range(dims):
-        matrix = []
-
-        for j in range(dims):
-
-            row = []
-
-            for k in range(dims):
-
-                christoffel_symbol = get_christoffel_symbol((i,j,k), g_inv, grads, dims)
-
-                christoffel_symbol = tf.expand_dims(christoffel_symbol, 1)
-                row.append(christoffel_symbol) 
-
-            row = tf.concat(row, 1)
-            row = tf.expand_dims(row, 1)
-            matrix.append(row)
-
-        matrix = tf.concat(matrix, 1)
-        matrix = tf.expand_dims(matrix, 1)
-        tensor.append(matrix)
-
-
-    return tf.concat(tensor,1)
-
-
-def get_christoffel_symbol(indices, g_inv, grads, dims):
-    '''
-        indices specified as (mu, nu, sigma) <=> \Lambda^\mu_{\\nu\sigma}
-    '''
-
-    mu, nu, sigma = indices
-
-    christoffel_symbol = tf.zeros([1], tf.float32)
-
-
-    for i in range(dims):
-        
-            
-        grad_sum =  grads[:,i, nu, sigma]  + grads[:, i, sigma, nu] - grads[:, sigma, nu, i]
-
-
-        
-        christoffel_symbol += 0.5 * g_inv[:,mu, i] * grad_sum
-
-    return christoffel_symbol
-
-
-
-
-
-
-
-def get_radius_test_coords(sample_cnt, full=False):
-
-    t = np.reshape(np.repeat(np.array(1),sample_cnt),(-1,1))
-    th = np.reshape(np.repeat(np.array(0.5), sample_cnt), (-1,1))
-    phi = np.reshape(np.repeat(np.array(0.5), sample_cnt), (-1,1))
-
-    r = None
-
-    if full:
-        r = np.reshape(np.linspace(0,1,sample_cnt)+3.01e-4,(-1,1))
-    else:
-        r = np.reshape(np.linspace(0,5e-4,sample_cnt)+3.01e-4,(-1,1))
-    
-    
-    coords = np.concatenate((t,r,th,phi),1)
-
-    return tf.convert_to_tensor(coords, dtype=tf.float32)
+    g_0 = g_pp * 0 
     
 
-def get_theta_test_coords(sample_cnt):
-
-    t = np.reshape(np.repeat(np.array(1),sample_cnt),(-1,1))
-    r = np.reshape(np.repeat(np.array(1e8), sample_cnt), (-1,1))
-    th = np.reshape(np.linspace(0,2*math.pi,sample_cnt),(-1,1))
-    phi = np.reshape(np.repeat(np.array(0.8), sample_cnt), (-1,1))
-
-    coords = np.concatenate((t,r,th,phi),1)
-
-    return tf.convert_to_tensor(coords, dtype=tf.float32)
-
-
-def get_phi_test_coords(sample_cnt):
-
-    t = np.reshape(np.repeat(np.array(1),sample_cnt),(-1,1))
-    r = np.reshape(np.repeat(np.array(1e8), sample_cnt), (-1,1))
-    th = np.reshape(np.repeat(np.array(2.5), sample_cnt), (-1,1))
-    phi = np.reshape(np.linspace(0,math.pi,sample_cnt), (-1,1))
-
-
-    coords = np.concatenate((t,r,th,phi),1)
-
-    return tf.convert_to_tensor(coords, dtype=tf.float32)
+    g_sp = tf.expand_dims(g_tt_inside,1)
+    g_spp = tf.expand_dims(g_tt_outside,1)
+ 
+    g_t = tf.concat([g_tt, g_0, g_0, g_0], 1)
+    g_t = tf.expand_dims(g_t, 1)
+    
+ 
+    g_r = tf.concat([g_0, g_rr, g_0, g_0], 1)
+    g_r = tf.expand_dims(g_r, 1)
+    
+ 
+    g_th = tf.concat([g_0, g_0, g_thth, g_0], 1)
+    g_th = tf.expand_dims(g_th,1)
+ 
+    g_p = tf.concat([g_0, g_0, g_0, g_pp],1)
+    g_p = tf.expand_dims(g_p,1)
+ 
+    return tf.concat([g_t, g_r, g_th, g_p],1)
 
 
-def timestamp_filename(f_str,path="/home/2312403d/masters/schwarzchild/saved_model_data/"):
-    return path + "_".join([f"{datetime.datetime.utcnow()}"[:-10].replace(" ", "_").replace(":", "-"), f_str])
+
 
 
 def get_true_metric(coords):
 
-    g_tt = tf.expand_dims(- (1 - (2*M_sol / (coords[:,1]*scaling_factors[1]))), 1)
-    g_rr = 1/(-g_tt)
-    g_thth = tf.expand_dims((coords[:,1] * scaling_factors[1]) **2, 1)
-    g_pp = g_thth * tf.math.sin(tf.expand_dims((coords[:,2] * scaling_factors[2]), 1))**2 
-
     
-    return  tf.concat([g_tt, g_rr, g_thth, g_pp], 1)
+    inside_mask_tensor = get_mask_function(inside=True, coords=coords)
+    outside_mask_tensor = get_mask_function(inside=False, coords=coords) 
+    g_rr_inside = 1 / (1 - 8/3 * math.pi * (coords[:,1] * scaling_factors[1])**2 * rho)
+    g_rr_outside = 1 / (1 -2*M_sol / (coords[:,1] * scaling_factors[1])) 
 
 
-def test_metric_logit(model, test_sample_cnt):
-  
-
-    radius_coords = get_radius_test_coords(test_sample_cnt)
-        
-    radius_true_metric = get_true_metric(radius_coords)
-
-#    np.save(timestamp_filename("radius_true_metric"), radius_true_metric)
-
-    radius_results = model(radius_coords)
-    radius_results = build_g(radius_results, radius_coords)
-    radius_results = logit(radius_results)
-
-    np.save(timestamp_filename("radius_predicted"), radius_results)
-
-    data_visualisation.save_grr_plot(timestamp_filename("radius_fig.jpg","/data/www.astro/2312403d/figs/"), radius_coords, radius_results, radius_true_metric)
-
+    g_rr =  tf.expand_dims(inside_mask_tensor * g_rr_inside + outside_mask_tensor * g_rr_outside , 1)
     
-def test_metric_log(model, test_sample_cnt):
-  
-
-    radius_coords = get_radius_test_coords(test_sample_cnt, True)
-        
-    radius_true_metric = get_true_metric(radius_coords)
-
-
-    radius_results = model(radius_coords)
-    radius_results = build_g(radius_results, radius_coords)
-    radius_results = tf.math.exp(radius_results)
-
-
-    data_visualisation.save_grr_plot(timestamp_filename("g_rr_in_full.jpg","/data/www.astro/2312403d/figs/"), radius_coords, radius_results, radius_true_metric)
-
-
-
-
-    radius_coords = get_radius_test_coords(test_sample_cnt)
-        
-    radius_true_metric = get_true_metric(radius_coords)
-
-
-    radius_results = model(radius_coords)
-    radius_results = build_g(radius_results, radius_coords)
-    radius_results = tf.math.exp(radius_results)
-
-
-    data_visualisation.save_grr_plot(timestamp_filename("g_rr_ROI_focussed.jpg","/data/www.astro/2312403d/figs/"), radius_coords, radius_results, radius_true_metric)
-
-
+    return build_g_from_g_rr(g_rr, coords) 
 
 
 
@@ -363,28 +188,220 @@ def get_spherical_minkowski_metric(coords):
     return  tf.concat([g_t, g_r, g_th, g_p],1)
 
 
-
-def build_g(g_rr, coords):
-
-
-    g_tt = tf.expand_dims(- (1 - (2*M_sol / coords[:,1])), 1)
-    g_thth = tf.expand_dims(coords[:,1]**2, 1)
-    g_pp = g_thth * tf.math.sin(tf.expand_dims(coords[:,2], 1))**2 
-    g_0 = g_pp * 0 
+def get_schwarzchild_metric(coords):
     
- 
+    r = coords[:,1] * scaling_factors[1]
+    th = coords[:,2] * scaling_factors[2]
+
+    g_tt = tf.expand_dims(- (1 - 2*M_sol/r) ,1)
+    g_rr = tf.expand_dims(1/(1 - 2*M_sol/r) ,1)
+    g_thth = tf.expand_dims(r**2 ,1)
+    g_pp = tf.expand_dims(r**2 * tf.math.sin(th)**2 ,1)
+    g_0 = g_pp * 0
+
+
     g_t = tf.concat([g_tt, g_0, g_0, g_0], 1)
     g_t = tf.expand_dims(g_t, 1)
-    
- 
+
     g_r = tf.concat([g_0, g_rr, g_0, g_0], 1)
     g_r = tf.expand_dims(g_r, 1)
     
- 
+
     g_th = tf.concat([g_0, g_0, g_thth, g_0], 1)
     g_th = tf.expand_dims(g_th,1)
- 
+
     g_p = tf.concat([g_0, g_0, g_0, g_pp],1)
     g_p = tf.expand_dims(g_p,1)
- 
-    return tf.concat([g_t, g_r, g_th, g_p],1)
+
+    return  tf.concat([g_t, g_r, g_th, g_p],1)
+
+
+
+#########################
+## testing functions   ##
+#########################
+
+
+
+def get_einstein_tensor_from_g(model, batch_size, use_model):
+
+    with tf.GradientTape() as t2:
+        with tf.GradientTape() as t1:
+    
+            
+            fixed_dict = {
+                    't': True,
+                    'r': False,
+                    'th': True, 
+                    'phi': True 
+                    }
+            coords = get_coords(size = batch_size, fixed_dict=fixed_dict, plotting=True) 
+            dims = coords.shape[1]
+            
+            
+            t1.watch(coords)
+            t2.watch(coords)
+
+            g = None
+
+            if use_model:
+                g_linear = model(coords)
+                g_linear = transform_metric(g_linear, True)
+                g = build_g_from_g_rr(g_linear, coords)
+            else:
+
+                g = get_true_metric(coords)
+
+
+        
+        g_inv = tf.linalg.inv(g)
+
+        grads = t1.batch_jacobian(g, coords) * get_scaling_factor_correction_tensor((batch_size,dims,dims,1))
+
+    
+        christoffel_tensor = 0.5 * (
+            tf.einsum('ail,aklj->aikj', g_inv, grads) 
+            + tf.einsum('ail,ajlk->aikj', g_inv, grads) 
+            - tf.einsum('ail,ajkl->aikj', g_inv, grads)
+        )
+    
+    christoffel_grads = t2.batch_jacobian(christoffel_tensor,coords) * get_scaling_factor_correction_tensor((batch_size,dims,dims,dims,1))
+
+    
+    
+    reimann_tensor = (
+        tf.einsum('amil,akmj->akijl',christoffel_tensor, christoffel_tensor)
+        - tf.einsum('amij,akml->akijl',christoffel_tensor, christoffel_tensor)
+        + tf.einsum('aijkl->aijlk', christoffel_grads)
+        - christoffel_grads
+        ) 
+    
+
+
+    ricci_tensor = tf.einsum('aijik', reimann_tensor)
+    
+    
+    ricci_scalar = tf.einsum('aij,aij->a',g_inv, ricci_tensor)
+
+    
+    contr_ricci_tensor = tf.einsum('aiy,ajz,ayz->aij',g_inv, g_inv, ricci_tensor)
+
+    
+    return get_einstein_tensor(contr_ricci_tensor, g_inv, ricci_scalar, dims)
+
+
+
+
+def test_metric_log_g_rr(model, test_sample_cnt): 
+
+    fixed_dict = {
+            't': True,
+            'r': False,
+            'th': True,
+            'phi': True 
+            }
+    coords = get_coords(size = test_sample_cnt, fixed_dict=fixed_dict, plotting=True) 
+        
+    true_metric = get_true_metric(coords) 
+
+
+#    results = 1 - (model(coords))/1000 
+    results = transform_metric(model(coords), True)
+    results = build_g_from_g_rr(results, coords)
+    results = results
+
+
+    data_visualisation.save_grr_plot(timestamp_filename("g_rr.jpg","/data/www.astro/2312403d/figs/"), coords, results, true_metric)
+
+    data_visualisation.save_4_4_tensor(timestamp_filename("full_g_sigmoid"),"g", coords, results)
+    data_visualisation.save_4_4_tensor("/data/www.astro/2312403d/figs/full_true_g","g", coords, true_metric)
+
+
+    einstein_tensor_predict = get_einstein_tensor_from_g(model, test_sample_cnt, True)
+    data_visualisation.save_4_4_tensor(timestamp_filename("full_G_sigmoid"),"G", coords, einstein_tensor_predict)
+
+    einstein_tensor_true = get_einstein_tensor_from_g(model, test_sample_cnt, False)
+    data_visualisation.save_4_4_tensor("/data/www.astro/2312403d/figs/full_true_G","G", coords, einstein_tensor_true)
+
+
+
+
+
+###############
+## general   ##
+###############
+
+def get_mask_function(inside, coords):
+
+    if inside:
+        return tf.cast(tf.math.less_equal(coords[:,1],tf.convert_to_tensor(np.array(R_sol/scaling_factors[1]), dtype=tf.float32)), dtype=tf.float32) 
+    else:
+        return tf.cast(tf.math.greater_equal(coords[:,1],tf.convert_to_tensor(np.array(R_sol/scaling_factors[1]), dtype=tf.float32)), dtype=tf.float32) 
+
+
+def get_scaling_factor_correction_tensor(shape):
+
+    correction_tensor = []
+
+
+    for i in range(4):
+        correction_tensor.append(tf.ones(shape=shape)  / scaling_factors[i])
+
+
+    return tf.concat(correction_tensor, -1)
+
+
+
+def timestamp_filename(f_str,path="/data/www.astro/2312403d/figs/"):
+    return path + "_".join([f"{datetime.datetime.utcnow()}"[:-10].replace(" ", "_").replace(":", "-"), f_str])
+
+
+
+
+
+
+
+
+
+def get_coords(size, fixed_dict, plotting):
+    '''
+    Fixed_dict: determines which cooridnates will cover a range of value or take just one value
+
+    plotting: determines whether linspace is used (in order for plotting) or random (for training)
+    '''
+
+    
+    t,r,th,phi = None, None, None, None 
+
+    if fixed_dict["t"]: 
+        t = np.reshape(np.repeat(np.array(1),size),(-1,1))
+    else:
+        t = np.reshape(np.random.random(size),(-1,1))
+    
+    if fixed_dict["r"]:
+        r = np.reshape(np.repeat(np.array(3e-2),size),(-1,1))
+    else:
+        if plotting:
+            r = np.reshape(np.linspace(0,1,size) ,(-1,1)) #TODO: refactor this when changing values
+        else:
+            r = np.reshape(np.random.random(size),(-1,1))
+
+        r = r*7e-2 + 4e-2
+#        r = r + 1e-2
+
+    if fixed_dict["th"]:
+        th = np.reshape(np.repeat(np.array(0.635), size), (-1,1))
+    else:
+        th = np.reshape(np.random.random(size),(-1,1))
+
+    if fixed_dict["phi"]:
+        phi = np.reshape(np.repeat(np.array(0.873), size), (-1,1))
+    else:
+        phi = np.reshape(np.random.random(size),(-1,1))
+
+    
+    coords = np.concatenate((t,r,th,phi),1)
+    coords = tf.convert_to_tensor(coords, dtype=tf.float32)
+    return coords
+
+
