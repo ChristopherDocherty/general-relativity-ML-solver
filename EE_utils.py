@@ -34,26 +34,6 @@ def transform_metric(output, from_model=False):
 #        return tf.math.exp(output) 
 
 
-BC_data = None
-def get_BC_data(batch_size):
-
-
-    t = np.reshape(np.random.random(batch_size),(-1,1))
-    r = np.reshape(np.repeat(np.array(8e-2),batch_size),(-1,1))
-    th = np.reshape(np.random.random(batch_size),(-1,1))
-    phi = np.reshape(np.random.random(batch_size),(-1,1))
-
-
-    coords_BC = np.concatenate((t,r,th,phi),1)
-    coords_BC = tf.convert_to_tensor(coords_BC, dtype=tf.float32)
-
-
-    metric_BC = get_true_metric(coords_BC)
-
-    return coords_BC, metric_BC 
-
-
-
 
 def T(coords, batch_size):
     '''

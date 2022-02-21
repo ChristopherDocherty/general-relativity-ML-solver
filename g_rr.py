@@ -24,6 +24,12 @@ tf.random.set_seed(1234)
 sample_cnt = 40000
 batch_size = 1000
 
+
+########################
+##   Setup Functions  ##
+########################
+ 
+
 def generate_faux_coords(sample_cnt):
     '''
     These are the fake coordinates that I need to pass to the training method
@@ -63,10 +69,16 @@ class EaseInPDELoss(tf.keras.callbacks.Callback):
 
 
 
+
+########################
+##       Model        ##
+########################
+
+
+
 initializer = tf.keras.initializers.GlorotUniform(
     seed = 1234
 )
-
 
 inputs = tf.keras.Input(shape=(4,), name="layer1")
 outputs = tf.keras.layers.Dense(32, activation='sigmoid', kernel_initializer=initializer, name="layer2")(inputs)
@@ -77,16 +89,18 @@ outputs = tf.keras.layers.Dense(1, kernel_initializer=initializer, name="last")(
 
 model = EE_PINN.PINN_g_rr(inputs, outputs)
 
-
-callback = EaseInPDELoss(model)
-
 model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1.0e-2))
 
 
 faux_coords, y = generate_faux_coords(sample_cnt)
-
+callback = EaseInPDELoss(model)
 
 history = model.fit(faux_coords, y, batch_size=batch_size, epochs=10, callbacks=[callback])
+
+
+########################
+##      Plotting      ##
+########################
 
 data_visualisation.save_losses_plot(EE_utils.timestamp_filename("losses.jpg","/data/www.astro/2312403d/figs/"), history)
 #data_visualisation.save_fixed_point_plots(EE_utils.timestamp_filename("fixed_point_results_1e-4.jpg","/data/www.astro/2312403d/figs/"), history)
