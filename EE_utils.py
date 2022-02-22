@@ -5,7 +5,6 @@ import math
 
 import data_visualisation
 
-one_tensor = tf.Variable([1.0])
 
 ### larger star ###
 #scaling_factors = [100.0, 1e7, 2*np.pi, np.pi]
@@ -149,7 +148,7 @@ def get_spherical_minkowski_metric(coords):
     g_pp = g_thth * tf.sin(tf.expand_dims(coords[:,2] * scaling_factors[2], 1))**2 
     g_0 = g_pp * 0
     
-    g_tt = g_0 - one_tensor
+    g_tt = g_0 - tf.Variable([1.0])
 
 
     g_t = tf.concat([g_tt, g_0, g_0, g_0], 1)
