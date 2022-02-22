@@ -83,7 +83,7 @@ class PINN_g_rr(tf.keras.Model):
         g_minkowski_2 = EE_utils.get_true_metric(coords_BC)
 
 
-        r = np.reshape(np.repeat(np.array(6.9e-2),batch_size),(-1,1))
+        r = np.reshape(np.repeat(np.array(6.99999999e-2),batch_size),(-1,1))
 
         coords_BC = np.concatenate((t,r,th,phi),1)
         coords_BC = tf.convert_to_tensor(coords_BC, dtype=tf.float32)
@@ -208,10 +208,10 @@ class PINN_g_rr(tf.keras.Model):
 
             loss, PDE_loss, BC_loss  = 0,0,0
 
-            PDE_loss = self.get_PDE_loss(batch_size, dims)
+            PDE_loss = 0#self.get_PDE_loss(batch_size, dims)
 
             PDE_loss = self.PDE_factor * PDE_loss 
-            BC_loss = self.get_BC_loss(batch_size)
+            BC_loss = 0#self.get_BC_loss(batch_size)
             
             loss = self.use_PINN * ( PDE_loss + BC_loss ) + (1 - self.use_PINN ) * self.funciton_approximation_loss(batch_size)
 

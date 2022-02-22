@@ -20,6 +20,9 @@ R_sol = 7
 rho = M_sol/(4/3 * math.pi * R_sol**3)
 
 
+
+
+
 def transform_metric(output, from_model=False):
 
     if from_model:
@@ -39,7 +42,7 @@ def T(coords, batch_size):
     come back and simplify this spaghetti code
     '''
 
-    inside_mask_tensor = get_mask_function(inside=True, coords=coords)
+    inside_mask_tensor = get_mask_function(inside=True, r=coords[:,1])
     inside_mask_tensor = tf.expand_dims(inside_mask_tensor,-1)
     inside_mask_tensor = tf.expand_dims(inside_mask_tensor,-1)
 
@@ -81,8 +84,8 @@ def get_einstein_tensor(contr_ricci_tensor, g_inv, ricci_scalar, dims):
 
 def build_g_from_g_rr(g_rr, coords):
 
-    inside_mask_tensor = get_mask_function(inside=True, coords=coords)
-    outside_mask_tensor = get_mask_function(inside=False, coords=coords) 
+    inside_mask_tensor = get_mask_function(inside=True, r=coords[:,1])
+    outside_mask_tensor = get_mask_function(inside=False, r=coords[:,1]) 
 
 
     g_tt_inside = -(1.5 * tf.math.sqrt(1 - 2*M_sol/R_sol) - 0.5 * tf.math.sqrt(1 - 2*M_sol* (coords[:,1] * scaling_factors[1])**2 / R_sol**3))**2
@@ -125,9 +128,10 @@ def build_g_from_g_rr(g_rr, coords):
 
 def get_true_metric(coords):
 
+    return get_sliced_true_metric(coords)
     
-    inside_mask_tensor = get_mask_function(inside=True, coords=coords)
-    outside_mask_tensor = get_mask_function(inside=False, coords=coords) 
+    inside_mask_tensor = get_mask_function(inside=True, r=coords[:,1])
+    outside_mask_tensor = get_mask_function(inside=False, r=coords[:,1]) 
     g_rr_inside = 1 / (1 - 8/3 * math.pi * (coords[:,1] * scaling_factors[1])**2 * rho)
     g_rr_outside = 1 / (1 -2*M_sol / (coords[:,1] * scaling_factors[1])) 
 
@@ -135,6 +139,11 @@ def get_true_metric(coords):
     g_rr =  tf.expand_dims(inside_mask_tensor * g_rr_inside + outside_mask_tensor * g_rr_outside , 1)
     
     return build_g_from_g_rr(g_rr, coords) 
+
+
+
+
+
 
 
 
@@ -273,6 +282,7 @@ def get_einstein_tensor_from_g(model, batch_size, use_model):
 
 def test_metric_log_g_rr(model, test_sample_cnt): 
 
+    return split_test_metric_log_g_rr(model, test_sample_cnt)
     fixed_dict = {
             't': True,
             'r': False,
@@ -284,23 +294,23 @@ def test_metric_log_g_rr(model, test_sample_cnt):
     true_metric = get_true_metric(coords) 
 
 
-#    results = 1 - (model(coords))/1000 
     results = transform_metric(model(coords), True)
     results = build_g_from_g_rr(results, coords)
-    results = results
 
 
     data_visualisation.save_grr_plot(timestamp_filename("g_rr.jpg","/data/www.astro/2312403d/figs/"), coords, results, true_metric)
 
-    data_visualisation.save_4_4_tensor(timestamp_filename("full_g_sigmoid"),"g", coords, results)
-    data_visualisation.save_4_4_tensor("/data/www.astro/2312403d/figs/full_true_g","g", coords, true_metric)
+#    data_visualisation.save_4_4_tensor(timestamp_filename("full_g_sigmoid"),"g", coords, results)
+#    data_visualisation.save_4_4_tensor("/data/www.astro/2312403d/figs/full_true_g","g", coords, true_metric)
 
 
-    einstein_tensor_predict = get_einstein_tensor_from_g(model, test_sample_cnt, True)
-    data_visualisation.save_4_4_tensor(timestamp_filename("full_G_sigmoid"),"G", coords, einstein_tensor_predict)
+#    einstein_tensor_predict = get_einstein_tensor_from_g(model, test_sample_cnt, True)
+#    data_visualisation.save_4_4_tensor(timestamp_filename("full_G_sigmoid"),"G", coords, einstein_tensor_predict)
+#
+#    einstein_tensor_true = get_einstein_tensor_from_g(model, test_sample_cnt, False)
+#    data_visualisation.save_4_4_tensor("/data/www.astro/2312403d/figs/full_true_G","G", coords, einstein_tensor_true)
 
-    einstein_tensor_true = get_einstein_tensor_from_g(model, test_sample_cnt, False)
-    data_visualisation.save_4_4_tensor("/data/www.astro/2312403d/figs/full_true_G","G", coords, einstein_tensor_true)
+
 
 
 
@@ -310,12 +320,12 @@ def test_metric_log_g_rr(model, test_sample_cnt):
 ## general   ##
 ###############
 
-def get_mask_function(inside, coords):
+def get_mask_function(inside, r):
 
     if inside:
-        return tf.cast(tf.math.less_equal(coords[:,1],tf.convert_to_tensor(np.array(R_sol/scaling_factors[1]), dtype=tf.float32)), dtype=tf.float32) 
+        return tf.cast(tf.math.less_equal(r,tf.convert_to_tensor(np.array(R_sol/scaling_factors[1]), dtype=tf.float32)), dtype=tf.float32) 
     else:
-        return tf.cast(tf.math.greater_equal(coords[:,1],tf.convert_to_tensor(np.array(R_sol/scaling_factors[1]), dtype=tf.float32)), dtype=tf.float32) 
+        return tf.cast(tf.math.greater_equal(r,tf.convert_to_tensor(np.array(R_sol/scaling_factors[1]), dtype=tf.float32)), dtype=tf.float32) 
 
 
 def get_scaling_factor_correction_tensor(shape):
@@ -342,13 +352,14 @@ def timestamp_filename(f_str,path="/data/www.astro/2312403d/figs/"):
 
 
 
-def get_coords(size, fixed_dict, plotting):
+def get_coords(size, fixed_dict, plotting, unsplit=False):
     '''
     Fixed_dict: determines which cooridnates will cover a range of value or take just one value
 
     plotting: determines whether linspace is used (in order for plotting) or random (for training)
     '''
 
+    return get_split_coords(size,fixed_dict, plotting, unsplit)
     
     t,r,th,phi = None, None, None, None 
 
@@ -383,4 +394,98 @@ def get_coords(size, fixed_dict, plotting):
     coords = tf.convert_to_tensor(coords, dtype=tf.float32)
     return coords
 
+
+
+
+
+
+###############
+## split ver ##
+###############
+
+split_half_width = 2e-2
+
+def get_sliced_true_metric(coords):
+
+
+    inside_r = coords[:,1] + split_half_width 
+    outside_r = coords[:,1] - split_half_width
+    
+    inside_mask_tensor = get_mask_function(inside=True, r=inside_r)
+    outside_mask_tensor = get_mask_function(inside=False, r=outside_r) 
+    g_rr_inside = 1 / (1 - 8/3 * math.pi * (inside_r * scaling_factors[1])**2 * rho)
+    g_rr_outside = 1 / (1 -2*M_sol / (outside_r * scaling_factors[1])) 
+
+
+    g_rr =  tf.expand_dims(inside_mask_tensor * g_rr_inside + outside_mask_tensor * g_rr_outside , 1)
+    
+    return build_g_from_g_rr(g_rr, coords) 
+
+def split_test_metric_log_g_rr(model, test_sample_cnt): 
+
+    fixed_dict = {
+            't': True,
+            'r': False,
+            'th': True,
+            'phi': True 
+            }
+    coords = get_coords(size = test_sample_cnt, fixed_dict=fixed_dict, plotting=True) 
+        
+    true_metric = get_true_metric(coords) 
+
+
+    results = transform_metric(model(coords), True)
+    results = build_g_from_g_rr(results, coords)
+
+    coords = get_coords(size = test_sample_cnt, fixed_dict=fixed_dict, plotting=False, unsplit=True) 
+
+    data_visualisation.save_grr_plot(timestamp_filename("g_rr.jpg","/data/www.astro/2312403d/figs/"), coords, results, true_metric)
+
+def get_split_coords(size, fixed_dict, plotting, unsplit):
+    '''
+    Fixed_dict: determines which cooridnates will cover a range of value or take just one value
+
+    plotting: determines whether linspace is used (in order for plotting) or random (for training)
+    '''
+
+    rescaled_R_sol = R_sol / scaling_factors[1]
+    
+    t,r,th,phi = None, None, None, None 
+
+    if fixed_dict["t"]: 
+        t = np.reshape(np.repeat(np.array(1),size),(-1,1))
+    else:
+        t = np.reshape(np.random.random(size),(-1,1))
+    
+    if fixed_dict["r"]:
+        r = np.reshape(np.repeat(np.array(3e-2),size),(-1,1))
+    else:
+        if plotting:
+            r1 = rescaled_R_sol - split_half_width - np.reshape(np.linspace(1e-2,0,size//2) ,(-1,1))
+            r2 = rescaled_R_sol + split_half_width + np.reshape(np.linspace(0,2e-2,size//2) ,(-1,1))
+            r = np.concatenate((r1,r2),0)
+        elif unsplit:
+            r1 = rescaled_R_sol - np.reshape(np.linspace(1e-2,0,size//2) ,(-1,1))
+            r2 = rescaled_R_sol + np.reshape(np.linspace(0,2e-2,size//2) ,(-1,1))
+            r = np.concatenate((r1,r2),0)
+
+        else:
+            r1 = rescaled_R_sol - split_half_width - np.reshape(np.random.random(size//2) * 1e-2 ,(-1,1))
+            r2 = rescaled_R_sol + split_half_width + np.reshape(np.random.random(size//2) * 2e-2 ,(-1,1))
+            r = np.concatenate((r1,r2),0)
+
+    if fixed_dict["th"]:
+        th = np.reshape(np.repeat(np.array(0.635), size), (-1,1))
+    else:
+        th = np.reshape(np.random.random(size),(-1,1))
+
+    if fixed_dict["phi"]:
+        phi = np.reshape(np.repeat(np.array(0.873), size), (-1,1))
+    else:
+        phi = np.reshape(np.random.random(size),(-1,1))
+
+    
+    coords = np.concatenate((t,r,th,phi),1)
+    coords = tf.convert_to_tensor(coords, dtype=tf.float32)
+    return coords
 

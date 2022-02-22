@@ -61,12 +61,13 @@ class EaseInPDELoss(tf.keras.callbacks.Callback):
         def on_epoch_end(self, epoch, logs=None):
 
 
-            if epoch == 50:
-                tf.keras.backend.set_value(self.model.use_PINN, tf.Variable(1.0, trainable=False, dtype=tf.float32))
-                tf.keras.backend.set_value(self.model.PDE_factor, tf.constant(1.0e6))
-                tf.keras.backend.set_value(self.model.optimizer.lr, 1e-6)
+            if 'loss' in logs and logs['loss'] < 1e-3:
+#                tf.keras.backend.set_value(self.model.use_PINN, tf.Variable(1.0, trainable=False, dtype=tf.float32))
+#                tf.keras.backend.set_value(self.model.PDE_factor, tf.constant(1.0e6))
+                tf.keras.backend.set_value(self.model.optimizer.lr, 1e-3)
 
-
+            if 'loss' in logs and logs['loss'] < 1e-4:
+                tf.keras.backend.set_value(self.model.optimizer.lr, 1e-4)
 
 
 
@@ -95,7 +96,7 @@ model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1.0e-2))
 faux_coords, y = generate_faux_coords(sample_cnt)
 callback = EaseInPDELoss(model)
 
-history = model.fit(faux_coords, y, batch_size=batch_size, epochs=10, callbacks=[callback])
+history = model.fit(faux_coords, y, batch_size=batch_size, epochs=750, callbacks=[callback])
 
 
 ########################
