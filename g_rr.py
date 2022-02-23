@@ -8,7 +8,7 @@ import numpy as np
 import EE_utils, EE_PINN
 import data_visualisation
 
-gpu_id = 2 
+gpu_id = 0 
 
 os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
 os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = 'true'
@@ -21,8 +21,8 @@ tf.random.set_seed(1234)
 
 
 
-sample_cnt = 40000
-batch_size = 1000
+sample_cnt = 100000
+batch_size = 10000
 
 
 ########################
@@ -54,7 +54,7 @@ class EaseInPDELoss(tf.keras.callbacks.Callback):
         def __init__(self, model):
             super(EaseInPDELoss, self).__init__()
             model.PDE_factor = tf.Variable(1.0, trainable=False, name='PDE_factor', dtype=tf.float32) 
-            model.use_PINN = tf.Variable(0.0, trainable=False, name='use_PINN', dtype=tf.float32) 
+            model.use_PINN = tf.Variable(1.0, trainable=False, name='use_PINN', dtype=tf.float32) 
 
             
 
@@ -90,13 +90,13 @@ outputs = tf.keras.layers.Dense(1, kernel_initializer=initializer, name="last")(
 
 model = EE_PINN.PINN_g_rr(inputs, outputs)
 
-model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1.0e-2))
+model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1.0e-1))
 
 
 faux_coords, y = generate_faux_coords(sample_cnt)
 callback = EaseInPDELoss(model)
 
-history = model.fit(faux_coords, y, batch_size=batch_size, epochs=750, callbacks=[callback])
+history = model.fit(faux_coords, y, batch_size=batch_size, epochs=500, callbacks=[callback])
 
 
 ########################

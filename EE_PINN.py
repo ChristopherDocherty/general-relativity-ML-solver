@@ -39,7 +39,6 @@ class PINN_g_rr(tf.keras.Model):
                 }
 
         coords = EE_utils.get_coords(size=batch_size, fixed_dict=fixed_dict, plotting=False) 
-        #t3.watch(coords)
         
 
 #            g_linear = tf.math.exp(self(coords))
@@ -58,45 +57,33 @@ class PINN_g_rr(tf.keras.Model):
         coordinates at the boundary radius for various t, phi and theta
         '''
 
+
+        BC_radii = [4e-2, 6.99999e-2, 11e-2] 
+
         t = np.reshape(np.random.random(batch_size),(-1,1))
-        r = np.reshape(np.repeat(np.array(11e-2),batch_size),(-1,1))
         th = np.reshape(np.random.random(batch_size),(-1,1))
         phi = np.reshape(np.random.random(batch_size),(-1,1))
 
+        g_rr = []
+        g_rr_true = []
 
-        coords_BC = np.concatenate((t,r,th,phi),1)
-        coords_BC = tf.convert_to_tensor(coords_BC, dtype=tf.float32)
-
-
-        g_rr_1= self(coords_BC)
-
-        g_minkowski = EE_utils.get_true_metric(coords_BC)
-
-        r = np.reshape(np.repeat(np.array(4e-2),batch_size),(-1,1))
-
-        coords_BC = np.concatenate((t,r,th,phi),1)
-        coords_BC = tf.convert_to_tensor(coords_BC, dtype=tf.float32)
+        for radius in BC_radii:
 
 
-        g_rr_2= self(coords_BC)
-
-        g_minkowski_2 = EE_utils.get_true_metric(coords_BC)
-
-
-        r = np.reshape(np.repeat(np.array(6.99999999e-2),batch_size),(-1,1))
-
-        coords_BC = np.concatenate((t,r,th,phi),1)
-        coords_BC = tf.convert_to_tensor(coords_BC, dtype=tf.float32)
+            r = np.reshape(np.repeat(np.array(radius),batch_size),(-1,1))
+            coords_BC = np.concatenate((t,r,th,phi),1)
+            coords_BC = tf.convert_to_tensor(coords_BC, dtype=tf.float32)
 
 
-        g_rr_3= self(coords_BC)
+            g_rr.append(self(coords_BC))
 
-        g_minkowski_3 = EE_utils.get_true_metric(coords_BC)
+            g_rr_true.append(EE_utils.get_true_metric(coords_BC)[:,1,1])
+
+
         
-        g_rr = tf.concat([g_rr_1, g_rr_2,g_rr_3],0)
-        g_rr_true= EE_utils.transform_metric(tf.concat([g_minkowski, g_minkowski_2, g_minkowski_3], 0)[:,1,1] , False)
-        g_rr_true = tf.expand_dims(g_rr_true,1)
-
+        g_rr = tf.concat(g_rr,0)
+        g_rr_true= [ tf.expand_dims(EE_utils.transform_metric(x, False), 1) for x in g_rr_true]
+        g_rr_true = tf.concat(g_rr_true, 0)
 
         return tf.math.reduce_mean(tf.math.square(g_rr - g_rr_true)) 
 
@@ -208,12 +195,12 @@ class PINN_g_rr(tf.keras.Model):
 
             loss, PDE_loss, BC_loss  = 0,0,0
 
-            PDE_loss = 0#self.get_PDE_loss(batch_size, dims)
+            PDE_loss = self.get_PDE_loss(batch_size, dims)
 
             PDE_loss = self.PDE_factor * PDE_loss 
-            BC_loss = 0#self.get_BC_loss(batch_size)
+            BC_loss = self.get_BC_loss(batch_size)
             
-            loss = self.use_PINN * ( PDE_loss + BC_loss ) + (1 - self.use_PINN ) * self.funciton_approximation_loss(batch_size)
+            loss = self.use_PINN * ( PDE_loss + BC_loss ) #+ (1 - self.use_PINN ) * self.funciton_approximation_loss(batch_size)
 
 
         gradients = t3.gradient(loss, self.trainable_variables)

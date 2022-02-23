@@ -128,7 +128,7 @@ def build_g_from_g_rr(g_rr, coords):
 
 def get_true_metric(coords):
 
-    return get_sliced_true_metric(coords)
+#    return get_sliced_true_metric(coords)
     
     inside_mask_tensor = get_mask_function(inside=True, r=coords[:,1])
     outside_mask_tensor = get_mask_function(inside=False, r=coords[:,1]) 
@@ -282,7 +282,8 @@ def get_einstein_tensor_from_g(model, batch_size, use_model):
 
 def test_metric_log_g_rr(model, test_sample_cnt): 
 
-    return split_test_metric_log_g_rr(model, test_sample_cnt)
+#    return split_test_metric_log_g_rr(model, test_sample_cnt)
+
     fixed_dict = {
             't': True,
             'r': False,
@@ -300,15 +301,15 @@ def test_metric_log_g_rr(model, test_sample_cnt):
 
     data_visualisation.save_grr_plot(timestamp_filename("g_rr.jpg","/data/www.astro/2312403d/figs/"), coords, results, true_metric)
 
-#    data_visualisation.save_4_4_tensor(timestamp_filename("full_g_sigmoid"),"g", coords, results)
-#    data_visualisation.save_4_4_tensor("/data/www.astro/2312403d/figs/full_true_g","g", coords, true_metric)
+    data_visualisation.save_4_4_tensor(timestamp_filename("full_g_sigmoid"),"g", coords, results)
+    data_visualisation.save_4_4_tensor("/data/www.astro/2312403d/figs/full_true_g","g", coords, true_metric)
 
 
-#    einstein_tensor_predict = get_einstein_tensor_from_g(model, test_sample_cnt, True)
-#    data_visualisation.save_4_4_tensor(timestamp_filename("full_G_sigmoid"),"G", coords, einstein_tensor_predict)
-#
-#    einstein_tensor_true = get_einstein_tensor_from_g(model, test_sample_cnt, False)
-#    data_visualisation.save_4_4_tensor("/data/www.astro/2312403d/figs/full_true_G","G", coords, einstein_tensor_true)
+    einstein_tensor_predict = get_einstein_tensor_from_g(model, test_sample_cnt, True)
+    data_visualisation.save_4_4_tensor(timestamp_filename("full_G_sigmoid"),"G", coords, einstein_tensor_predict)
+
+    einstein_tensor_true = get_einstein_tensor_from_g(model, test_sample_cnt, False)
+    data_visualisation.save_4_4_tensor("/data/www.astro/2312403d/figs/full_true_G","G", coords, einstein_tensor_true)
 
 
 
@@ -359,7 +360,7 @@ def get_coords(size, fixed_dict, plotting, unsplit=False):
     plotting: determines whether linspace is used (in order for plotting) or random (for training)
     '''
 
-    return get_split_coords(size,fixed_dict, plotting, unsplit)
+#    return get_split_coords(size,fixed_dict, plotting, unsplit)
     
     t,r,th,phi = None, None, None, None 
 
