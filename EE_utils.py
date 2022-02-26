@@ -404,7 +404,27 @@ def get_coords(size, fixed_dict, plotting, unsplit=False):
 ## split ver ##
 ###############
 
-split_half_width = 2e-2
+split_half_width = 5e-3
+
+def split_T(coords):
+    
+    inside_mask_tensor = get_mask_function(inside=True, r=coords[:,1])
+    inside_mask_tensor = tf.expand_dims(inside_mask_tensor,-1)
+    inside_mask_tensor = tf.expand_dims(inside_mask_tensor,-1)
+
+    inside_T = tf.convert_to_tensor(np.array([
+        [rho, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0]
+    ]) 
+    , dtype=tf.float32)
+
+    inside_T = tf.expand_dims(inside_T,0)
+    inside_T = tf.repeat(inside_T,batch_size, 0)
+
+    return inside_mask_tensor * inside_T
+
 
 def get_sliced_true_metric(coords):
 
@@ -442,7 +462,7 @@ def split_test_metric_log_g_rr(model, test_sample_cnt):
 
     data_visualisation.save_grr_plot(timestamp_filename("g_rr.jpg","/data/www.astro/2312403d/figs/"), coords, results, true_metric)
 
-def get_split_coords(size, fixed_dict, plotting, unsplit):
+def get_split_coords(size, fixed_dict, plotting, unsplit=False):
     '''
     Fixed_dict: determines which cooridnates will cover a range of value or take just one value
 
@@ -490,3 +510,135 @@ def get_split_coords(size, fixed_dict, plotting, unsplit):
     coords = tf.convert_to_tensor(coords, dtype=tf.float32)
     return coords
 
+
+
+
+
+#####################
+## SImplifications ##
+#####################
+
+
+
+
+
+def get_true_metric_grads(coords, batch_size, dims):
+
+
+    with tf.GradientTape() as t:
+        t.watch(coords)
+
+        g = get_true_metric(coords)
+
+    
+    return t.batch_jacobian(g, coords) * get_scaling_factor_correction_tensor((batch_size,dims,dims,1))
+
+
+
+
+def get_analytical_christoffel(coords):
+
+    c = 8/3 * math.pi * rho
+    b = 3/2 * math.sqrt(1- 2 * M_sol / R_sol)
+    r_s = 2*M_sol
+
+    r = coords[:,1] * scaling_factors[1]
+    theta = coords[:,2] * scaling_factors[2]
+
+    
+    ins = get_mask_function(inside=True, r=coords[:,1])
+    out = get_mask_function(inside=False, r=coords[:,1]) 
+
+
+
+    c_rrr = tf.expand_dims( 
+            ins * (c *r / (1 - c*r**2)) 
+            - out * r_s / ( 2* r * (r - r_s))
+                , 1)
+              
+    c_rtt = tf.expand_dims( 
+            ins * 0.5 * (( b*c*r / tf.math.sqrt(1 - c*r**2) - 0.5*c*r) * (1 - c*r**2))
+            + out * (r_s* (r - r_s) / (2*r**3)) 
+            , 1)
+              
+    c_rthth = tf.expand_dims( 
+            ins * (c*r**3 - r)
+            - out * (r - r_s)
+            , 1)
+              
+    c_rpp = tf.expand_dims( 
+            ins * (c*r**3 - r) * tf.math.sin(theta)**2
+            - out * (r-r_s) * tf.math.sin(theta)**2
+            , 1)
+              
+    c_thpp = tf.expand_dims(  -tf.math.sin(theta) * tf.math.cos(theta), 1)
+              
+ #   c_ttr = tf.expand_dims( 
+ #       ins *( ( b*c*r / tf.math.sqrt(1 - c*r**2) - 0.5*c*r) / (2*b - tf.math.sqrt(1 - c*r**2)))
+ #       + out * r_s / ( 2* r * (r - r_s))
+ #       , 1)
+
+#    c_ttr = tf.expand_dims( ins * c*r / ( 2 * tf.math.sqrt(1 - c*r**2)) ,1)
+
+    c_ttr = tf.expand_dims( ins * 
+                0.5 * 
+                (c*r/tf.math.sqrt(1 - c*r**2)) *
+                1/(b - 0.5 * tf.math.sqrt(1 - c*r**2))
+            , 1)
+
+#    c_ttr = tf.expand_dims(
+#                ins * c/2 * 1/( (b-0.5*tf.math.sqrt(1 - c*r**2)) * (1 - c*r**2) ) 
+#                * (c*r**2/(2*(b-0.5*tf.math.sqrt(1 - c*r**2)) + 1/tf.math.sqrt(1-c*r**2)))
+#            ,1)
+
+
+
+    c_ththr = tf.expand_dims( 1/r, 1)
+              
+    c_ppr = tf.expand_dims( 1/r, 1)
+              
+    c_ppth = tf.expand_dims(  1/ tf.math.tan(theta), 1)
+
+    c_000 = c_ppr * 0
+
+    
+
+    c_tt = tf.concat([c_000, c_ttr,c_000,c_000],1)
+    c_tr = tf.concat([c_ttr,c_000,c_000,c_000],1)
+
+    c_rt = tf.concat([c_rtt, c_000, c_000, c_000],1)
+    c_rr = tf.concat([c_000, c_rrr, c_000, c_000],1)
+    c_rth = tf.concat([c_000, c_000, c_rthth, c_000],1)
+    c_rp = tf.concat([c_000, c_000, c_000, c_rpp],1)
+
+
+    c_thr = tf.concat([c_000, c_000, c_ththr, c_000],1)
+    c_thth = tf.concat([c_000, c_ththr, c_000, c_000],1)
+    c_thp = tf.concat([c_000, c_000, c_000, c_thpp],1)
+
+
+    c_pr = tf.concat([c_000,c_000, c_000, c_ppr],1)
+    c_pth = tf.concat([c_000, c_000, c_000, c_ppth],1)
+    c_pp = tf.concat([c_000, c_ppr, c_ppth, c_000],1)
+    
+    c_00 = tf.concat([c_000,c_000,c_000,c_000],1)
+
+
+
+
+    c_t = [c_tt, c_tr,c_00,c_00]
+    c_t = tf.concat([tf.expand_dims(x,1) for x in c_t], 1)
+
+    c_r = [c_rt, c_rr, c_rth, c_rp]
+    c_r = tf.concat([tf.expand_dims(x,1) for x in c_r], 1)
+
+
+    c_th = [c_00, c_thr, c_thth, c_thp]
+    c_th = tf.concat([tf.expand_dims(x,1) for x in c_th], 1)
+
+    c_p = [c_00, c_pr, c_pth, c_pp]
+    c_p = tf.concat([tf.expand_dims(x,1) for x in c_p], 1)
+
+    c = [c_t, c_r, c_th, c_p]
+
+    return tf.concat([tf.expand_dims(x,1) for x in c], 1)

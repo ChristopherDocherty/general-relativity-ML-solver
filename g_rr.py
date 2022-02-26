@@ -8,7 +8,7 @@ import numpy as np
 import EE_utils, EE_PINN
 import data_visualisation
 
-gpu_id = 0 
+gpu_id = 2 
 
 os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
 os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = 'true'
@@ -21,8 +21,8 @@ tf.random.set_seed(1234)
 
 
 
-sample_cnt = 100000
-batch_size = 10000
+sample_cnt = 20000
+batch_size = 2000
 
 
 ########################
@@ -53,7 +53,8 @@ class EaseInPDELoss(tf.keras.callbacks.Callback):
 
         def __init__(self, model):
             super(EaseInPDELoss, self).__init__()
-            model.PDE_factor = tf.Variable(1.0, trainable=False, name='PDE_factor', dtype=tf.float32) 
+            model.PDE_factor = tf.Variable(0.0, trainable=False, name='PDE_factor', dtype=tf.float32) 
+            model.BC_factor = tf.Variable(1, trainable=False, name='BC_factor', dtype=tf.float32)
             model.use_PINN = tf.Variable(1.0, trainable=False, name='use_PINN', dtype=tf.float32) 
 
             
@@ -61,15 +62,17 @@ class EaseInPDELoss(tf.keras.callbacks.Callback):
         def on_epoch_end(self, epoch, logs=None):
 
 
-            if 'loss' in logs and logs['loss'] < 1e-3:
+            if 'BC_loss' in logs and logs['BC_loss'] < 1e-4:
 #                tf.keras.backend.set_value(self.model.use_PINN, tf.Variable(1.0, trainable=False, dtype=tf.float32))
-#                tf.keras.backend.set_value(self.model.PDE_factor, tf.constant(1.0e6))
+                tf.keras.backend.set_value(self.model.PDE_factor, tf.constant(1.0e11))
+                tf.keras.backend.set_value(self.model.optimizer.lr, 1e-2)
+
+            if 'PDE_loss' in logs and logs['PDE_loss'] < 1:
                 tf.keras.backend.set_value(self.model.optimizer.lr, 1e-3)
 
-            if 'loss' in logs and logs['loss'] < 1e-4:
+
+            if 'PDE_loss' in logs and logs['PDE_loss'] < 1e-4:
                 tf.keras.backend.set_value(self.model.optimizer.lr, 1e-4)
-
-
 
 ########################
 ##       Model        ##
@@ -96,7 +99,7 @@ model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1.0e-1))
 faux_coords, y = generate_faux_coords(sample_cnt)
 callback = EaseInPDELoss(model)
 
-history = model.fit(faux_coords, y, batch_size=batch_size, epochs=500, callbacks=[callback])
+history = model.fit(faux_coords, y, batch_size=batch_size, epochs=250, callbacks=[callback])
 
 
 ########################
