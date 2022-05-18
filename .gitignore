@@ -2,4 +2,6 @@ condor_dat/*
 .ignore/*
 *.swp
 PINN/*
-__pycache__/*
+__pycache__/
+.mypy_cache/
+
