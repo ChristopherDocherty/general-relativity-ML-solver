@@ -301,15 +301,20 @@ def test_metric_log_g_rr(model, test_sample_cnt):
 
     data_visualisation.save_grr_plot(timestamp_filename("g_rr.jpg","/data/www.astro/2312403d/figs/"), coords, results, true_metric)
 
-    data_visualisation.save_4_4_tensor(timestamp_filename("full_g_sigmoid"),"g", coords, results)
-    data_visualisation.save_4_4_tensor("/data/www.astro/2312403d/figs/full_true_g","g", coords, true_metric)
+#    data_visualisation.save_4_4_tensor(timestamp_filename("full_g_sigmoid"),"g", coords, results, "Network Predicted")
+#    data_visualisation.save_4_4_tensor("/data/www.astro/2312403d/figs/full_true_g","g", coords, true_metric, "Analytical")
+
+
+    
+
+    trueset_G = 8 * math.pi * T(coords, test_sample_cnt)
 
 
     einstein_tensor_predict = get_einstein_tensor_from_g(model, test_sample_cnt, True)
-    data_visualisation.save_4_4_tensor(timestamp_filename("full_G_sigmoid"),"G", coords, einstein_tensor_predict)
+    data_visualisation.save_4_4_tensor(timestamp_filename("full_G_sigmoid"),"G", coords, einstein_tensor_predict, "", "PINN Einstein Tensor Prediction", trueset_G)
 
     einstein_tensor_true = get_einstein_tensor_from_g(model, test_sample_cnt, False)
-    data_visualisation.save_4_4_tensor("/data/www.astro/2312403d/figs/full_true_G","G", coords, einstein_tensor_true)
+    data_visualisation.save_4_4_tensor("/data/www.astro/2312403d/figs/full_true_G","G", coords, einstein_tensor_true, "", "Einstein Tensor Found From Analytical Metric", trueset_G)
 
 
 
@@ -642,3 +647,48 @@ def get_analytical_christoffel(coords):
     c = [c_t, c_r, c_th, c_p]
 
     return tf.concat([tf.expand_dims(x,1) for x in c], 1)
+
+
+
+
+
+
+def get_analytical_reimann(coords,batch_size, dims):
+
+    with tf.GradientTape() as t2:
+        with tf.GradientTape() as t1:
+    
+
+            t1.watch(coords)
+            t2.watch(coords)
+    
+            g = get_true_metric(coords) 
+    
+        g_inv = tf.linalg.inv(g)
+
+        grads = t1.batch_jacobian(g, coords) * get_scaling_factor_correction_tensor((batch_size,dims,dims,1))
+
+
+
+        
+    
+        christoffel_tensor = 0.5 * (
+            tf.einsum('ail,aklj->aikj', g_inv, grads) 
+            + tf.einsum('ail,ajlk->aikj', g_inv, grads) 
+            - tf.einsum('ail,ajkl->aikj', g_inv, grads)
+        )
+
+
+
+    christoffel_grads = t2.batch_jacobian(christoffel_tensor,coords) * get_scaling_factor_correction_tensor((batch_size,dims,dims,dims,1))
+
+    
+    
+    reimann_tensor = (
+        tf.einsum('amil,akmj->akijl',christoffel_tensor, christoffel_tensor)
+        - tf.einsum('amij,akml->akijl',christoffel_tensor, christoffel_tensor)
+        + tf.einsum('aijkl->aijlk', christoffel_grads)
+        - christoffel_grads
+        ) 
+
+    return reimann_tensor

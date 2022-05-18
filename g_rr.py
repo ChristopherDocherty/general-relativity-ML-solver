@@ -21,8 +21,8 @@ tf.random.set_seed(1234)
 
 
 
-sample_cnt = 20000
-batch_size = 2000
+sample_cnt = 100000
+batch_size = 1000
 
 
 ########################
@@ -65,14 +65,22 @@ class EaseInPDELoss(tf.keras.callbacks.Callback):
             if 'BC_loss' in logs and logs['BC_loss'] < 1e-4:
 #                tf.keras.backend.set_value(self.model.use_PINN, tf.Variable(1.0, trainable=False, dtype=tf.float32))
                 tf.keras.backend.set_value(self.model.PDE_factor, tf.constant(1.0e11))
-                tf.keras.backend.set_value(self.model.optimizer.lr, 1e-2)
+#                tf.keras.backend.set_value(self.model.optimizer.lr, 1e-4)
+#                tf.keras.backend.set_value(self.model.optimizer.lr, 1e-2)
 
-            if 'PDE_loss' in logs and logs['PDE_loss'] < 1:
-                tf.keras.backend.set_value(self.model.optimizer.lr, 1e-3)
+#            if epoch == 1000:
+#                tf.keras.backend.set_value(self.model.optimizer.lr, 1e-2)
+
+#            if 'PDE_loss' in logs and logs['PDE_loss'] < 1e4:
+#                tf.keras.backend.set_value(self.model.optimizer.lr, 1e-4)
 
 
-            if 'PDE_loss' in logs and logs['PDE_loss'] < 1e-4:
+            if 'PDE_loss' in logs and logs['PDE_loss'] < 1e-12:
+                tf.keras.backend.set_value(self.model.optimizer.lr, 1e-5)
+
+            if 'PDE_loss' in logs and logs['PDE_loss'] < 6e-3:
                 tf.keras.backend.set_value(self.model.optimizer.lr, 1e-4)
+
 
 ########################
 ##       Model        ##
@@ -93,20 +101,20 @@ outputs = tf.keras.layers.Dense(1, kernel_initializer=initializer, name="last")(
 
 model = EE_PINN.PINN_g_rr(inputs, outputs)
 
-model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1.0e-1))
+model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1.0e-2))
 
 
 faux_coords, y = generate_faux_coords(sample_cnt)
 callback = EaseInPDELoss(model)
 
-history = model.fit(faux_coords, y, batch_size=batch_size, epochs=250, callbacks=[callback])
+#history = model.fit(faux_coords, y, batch_size=batch_size, epochs=2000, callbacks=[callback])
 
 
 ########################
 ##      Plotting      ##
 ########################
 
-data_visualisation.save_losses_plot(EE_utils.timestamp_filename("losses.jpg","/data/www.astro/2312403d/figs/"), history)
+#data_visualisation.save_losses_plot(EE_utils.timestamp_filename("losses.jpg","/data/www.astro/2312403d/figs/"), history)
 #data_visualisation.save_fixed_point_plots(EE_utils.timestamp_filename("fixed_point_results_1e-4.jpg","/data/www.astro/2312403d/figs/"), history)
 
 EE_utils.test_metric_log_g_rr(model, 5000)

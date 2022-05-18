@@ -126,8 +126,10 @@ class PINN_g_rr(tf.keras.Model):
             grads = t1.batch_jacobian(g, coords) * EE_utils.get_scaling_factor_correction_tensor((batch_size,dims,dims,1))
 
 
-
-            
+#            true_grads = EE_utils.get_true_metric_grads(coords, batch_size, dims)
+#
+#            return tf.math.reduce_mean(tf.math.square(grads - true_grads))
+#            
         
             christoffel_tensor = 0.5 * (
                 tf.einsum('ail,aklj->aikj', g_inv, grads) 
@@ -135,37 +137,41 @@ class PINN_g_rr(tf.keras.Model):
                 - tf.einsum('ail,ajkl->aikj', g_inv, grads)
             )
 
-            true_christoffel_tensor = EE_utils.get_analytical_christoffel(coords)
+#            true_christoffel_tensor = EE_utils.get_analytical_christoffel(coords)
+#
+#            return tf.math.reduce_mean(tf.math.square(christoffel_tensor - true_christoffel_tensor))
 
-
-            return tf.math.reduce_mean(tf.math.square(christoffel_tensor - true_christoffel_tensor))
 
 
             
-#        christoffel_grads = t2.batch_jacobian(christoffel_tensor,coords) * EE_utils.get_scaling_factor_correction_tensor((batch_size,dims,dims,dims,1))
+        christoffel_grads = t2.batch_jacobian(christoffel_tensor,coords) * EE_utils.get_scaling_factor_correction_tensor((batch_size,dims,dims,dims,1))
+
+        
+        
+        reimann_tensor = (
+            tf.einsum('amil,akmj->akijl',christoffel_tensor, christoffel_tensor)
+            - tf.einsum('amij,akml->akijl',christoffel_tensor, christoffel_tensor)
+            + tf.einsum('aijkl->aijlk', christoffel_grads)
+            - christoffel_grads
+            ) 
+        
+#        true_reimann_tensor = EE_utils.get_analytical_reimann(coords, batch_size, dims)
 #
-#        
-#        
-#        reimann_tensor = (
-#            tf.einsum('amil,akmj->akijl',christoffel_tensor, christoffel_tensor)
-#            - tf.einsum('amij,akml->akijl',christoffel_tensor, christoffel_tensor)
-#            + tf.einsum('aijkl->aijlk', christoffel_grads)
-#            - christoffel_grads
-#            ) 
-#        
 #
-#
-#        ricci_tensor = tf.einsum('aijik', reimann_tensor)
-#        
-#        ricci_scalar = tf.einsum('aij,aij->a',g_inv, ricci_tensor)
-#
-#        contr_ricci_tensor = tf.einsum('aiy,ajz,ayz->aij',g_inv, g_inv, ricci_tensor)
-#
-#        
-#        einstein_tensor = EE_utils.get_einstein_tensor(contr_ricci_tensor, g_inv, ricci_scalar, dims)
-#
-#        
-#        EE_loss = tf.math.reduce_mean(tf.math.square(einstein_tensor - 8*np.pi*EE_utils.T(coords,batch_size)))
+#        return tf.math.reduce_mean(tf.math.square(reimann_tensor - true_reimann_tensor))
+
+
+        ricci_tensor = tf.einsum('aijik', reimann_tensor)
+        
+        ricci_scalar = tf.einsum('aij,aij->a',g_inv, ricci_tensor)
+
+        contr_ricci_tensor = tf.einsum('aiy,ajz,ayz->aij',g_inv, g_inv, ricci_tensor)
+
+        
+        einstein_tensor = EE_utils.get_einstein_tensor(contr_ricci_tensor, g_inv, ricci_scalar, dims)
+
+        
+        EE_loss = tf.math.reduce_mean(tf.math.square(einstein_tensor - 8*np.pi*EE_utils.T(coords,batch_size)))
 
         
         return EE_loss
@@ -205,10 +211,10 @@ class PINN_g_rr(tf.keras.Model):
 
             PDE_loss = self.get_PDE_loss(batch_size, dims)
 
-            PDE_loss = self.PDE_factor * PDE_loss 
+            PDE_loss = PDE_loss 
             BC_loss = self.get_BC_loss(batch_size)
             
-            loss = self.use_PINN * ( PDE_loss + self.BC_factor * BC_loss ) #+ (1 - self.use_PINN ) * self.funciton_approximation_loss(batch_size)
+            loss = self.use_PINN * ( self.PDE_factor * PDE_loss + self.BC_factor * BC_loss ) #+ (1 - self.use_PINN ) * self.funciton_approximation_loss(batch_size)
 
 
         gradients = t3.gradient(loss, self.trainable_variables)
