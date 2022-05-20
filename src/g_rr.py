@@ -6,7 +6,7 @@ import tensorflow as tf
 import numpy as np
 
 from utils import EE_utils 
-from models import EE_PINN
+from models import einstein_tensor_PINN as EE_PINN
 
 gpu_id = 2 
 

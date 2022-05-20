@@ -5,7 +5,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import tensorflow as tf
 import numpy as np
 
-from utils import EE_utils
+from utils import EE_utils, analytic_functions, utils
 
 
 
@@ -49,7 +49,7 @@ class PINN_g_rr(tf.keras.Model):
 
             g_rr.append(self(coords_BC))
 
-            g_rr_true.append(EE_utils.get_true_metric(coords_BC)[:,1,1])
+            g_rr_true.append(analytic_functions.get_true_metric(coords_BC)[:,1,1])
 
 
         
@@ -90,13 +90,13 @@ class PINN_g_rr(tf.keras.Model):
 
                 g_linear = EE_utils.transform_metric(g_linear, True)
         
-                g = EE_utils.build_g_from_g_rr(g_linear, coords)
+                g = analytic_functions.build_g_from_g_rr(g_linear, coords)
         
         
         
             g_inv = tf.linalg.inv(g)
 
-            grads = t1.batch_jacobian(g, coords) * EE_utils.get_scaling_factor_correction_tensor((batch_size,dims,dims,1))
+            grads = t1.batch_jacobian(g, coords) * utils.get_scaling_factor_correction_tensor((batch_size,dims,dims,1))
 
 
         
@@ -106,9 +106,9 @@ class PINN_g_rr(tf.keras.Model):
                 - tf.einsum('ail,ajkl->aikj', g_inv, grads)
             )
 
-#            true_christoffel_tensor = EE_utils.get_analytical_christoffel(coords)
-#
-#            return tf.math.reduce_mean(tf.math.square(christoffel_tensor - true_christoffel_tensor))
+            true_christoffel_tensor = analytic_functions.get_analytical_christoffel(coords)
+
+            return tf.math.reduce_mean(tf.math.square(christoffel_tensor - true_christoffel_tensor))
 
         christoffel_grads = t2.batch_jacobian(christoffel_tensor,coords) * EE_utils.get_scaling_factor_correction_tensor((batch_size,dims,dims,dims,1))
 
