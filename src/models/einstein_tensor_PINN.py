@@ -22,33 +22,6 @@ class PINN_g_rr(tf.keras.Model):
     PINN class for calculating loss for Einsteins Equations
     '''
 
-    def funciton_approximation_loss(self, batch_size):
-        '''
-            This is only used to get an idea of what the network could predict
-
-            The thinking is that, if the network can't find the solution when just 
-            matching the exact function values, it isn't likely to be able to match 
-            using the PINN method
-        '''
-
-        fixed_dict = {
-                't': False,
-                'r': False,
-                'th': False,
-                'phi': False                        
-                }
-
-        coords = EE_utils.get_coords(size=batch_size, fixed_dict=fixed_dict, plotting=False) 
-        
-
-        g_linear = self(coords)
-
-        g_rr_true= tf.expand_dims(EE_utils.get_true_metric(coords)[:,1,1], 1)
-        g_rr_true = EE_utils.transform_metric(g_rr_true, False) 
-
-        return tf.reduce_mean(tf.square(g_linear - g_rr_true))
-
-
     def get_BC_loss(self, batch_size):
         '''
         Calculates the boundary condition loss by generating 
@@ -126,10 +99,6 @@ class PINN_g_rr(tf.keras.Model):
             grads = t1.batch_jacobian(g, coords) * EE_utils.get_scaling_factor_correction_tensor((batch_size,dims,dims,1))
 
 
-#            true_grads = EE_utils.get_true_metric_grads(coords, batch_size, dims)
-#
-#            return tf.math.reduce_mean(tf.math.square(grads - true_grads))
-#            
         
             christoffel_tensor = 0.5 * (
                 tf.einsum('ail,aklj->aikj', g_inv, grads) 
@@ -141,9 +110,6 @@ class PINN_g_rr(tf.keras.Model):
 #
 #            return tf.math.reduce_mean(tf.math.square(christoffel_tensor - true_christoffel_tensor))
 
-
-
-            
         christoffel_grads = t2.batch_jacobian(christoffel_tensor,coords) * EE_utils.get_scaling_factor_correction_tensor((batch_size,dims,dims,dims,1))
 
         
@@ -184,7 +150,7 @@ class PINN_g_rr(tf.keras.Model):
         phi = 0.4
         theta = 0.3
 
-        fixed_radii =[1e-3,2e-3, 5e-3,1e-2,2e-2, 1e-1, 5e-1, 1]
+        fixed_radii =[]
 
         fixed_points = [tf.convert_to_tensor(np.array([[t, r, phi, theta]]), dtype=tf.float32) for r in fixed_radii] 
 
@@ -200,10 +166,10 @@ class PINN_g_rr(tf.keras.Model):
 
         '''
 
-        dummy_coords, g_true = data
+        placeholder_coords, _ = data
 
-        dims = dummy_coords.shape[1]
-        batch_size = dummy_coords.shape[0] 
+        dims = placeholder_coords.shape[1]
+        batch_size = placeholder_coords.shape[0] 
 
         with tf.GradientTape() as t3:
 
@@ -214,7 +180,7 @@ class PINN_g_rr(tf.keras.Model):
             PDE_loss = PDE_loss 
             BC_loss = self.get_BC_loss(batch_size)
             
-            loss = self.use_PINN * ( self.PDE_factor * PDE_loss + self.BC_factor * BC_loss ) #+ (1 - self.use_PINN ) * self.funciton_approximation_loss(batch_size)
+            loss = self.PDE_factor * PDE_loss + BC_loss 
 
 
         gradients = t3.gradient(loss, self.trainable_variables)

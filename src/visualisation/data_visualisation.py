@@ -13,36 +13,6 @@ matplotlib.rc('xtick', labelsize=14)
 matplotlib.rc('ytick', labelsize=14)
 
 
-
-
-
-
-def save_fixed_point_plots(filename, history):
-
-
-    fixed_point_results = {key: value for key, value in history.history.items() if key not in { "loss", "PDE_loss", "BC_loss"} }
-
-    num_fp = len(fixed_point_results)
-
-    
-    plt.figure(1, (6.5 * num_fp,6))
-    plt.clf()
-
-
-    for i, (radius, fp_values) in enumerate(fixed_point_results.items()):
-
-        plt.subplot(1,num_fp + 1, i+1)
-        plt.title(f"r = {radius}")
-        plt.xlabel("Samples (x1000)")
-        plt.ylabel(r"$g_tr$")
-        plt.plot(fp_values)
-
-
-    plt.gcf().set_size_inches(6.1*num_fp, 6)
-    plt.gcf().tight_layout()
-    
-    plt.savefig(filename, dpi=dpi)
-
 def save_losses_plot(filename, history):
 
 
@@ -87,6 +57,7 @@ def save_losses_plot(filename, history):
     plt.savefig(filename, dpi=dpi)
 
 
+
 def save_grr_plot(filename, coords, predicted_metric, true_metric): 
 
     r = coords[:,1] * 1e2
@@ -97,23 +68,7 @@ def save_grr_plot(filename, coords, predicted_metric, true_metric):
     axis_font_size = 18
 
 
-#    plt.subplot(1,3,1)
-#    plt.title(r'Network Prediction', fontsize=title_font_size, y=1.08)
-#    plt.xlabel(r'$r$', fontsize=axis_font_size)
-#    plt.ylabel(r'$g_{rr}$', fontsize=axis_font_size)
-#    plt.plot(r, predicted_metric[:,1,1], 'b')
-#
-#
-#    plt.subplot(1,3,2)
-#    plt.title(r'Analytical Solution', fontsize=title_font_size, y=1.08)
-#    plt.xlabel(r'$r$', fontsize=axis_font_size)
-#    plt.ylabel(r'$g_{rr}$', fontsize=axis_font_size)
-#    plt.plot(r, true_metric[:,1,1], 'r')
-#
-#
-#    plt.subplot(1,3,3)
     plt.title(r'PINN $g_{rr}$ prediction', fontsize=title_font_size, y=1.08)
-#    plt.yscale('log')
     plt.xlabel(r'$r$ (m)', fontsize=axis_font_size)
     plt.ylabel(r'$g_{rr}$', fontsize=axis_font_size)
     plt.plot(r, predicted_metric[:,1,1], 'b', label="Calculated From the Analytical Metric")
@@ -127,7 +82,8 @@ def save_grr_plot(filename, coords, predicted_metric, true_metric):
     plt.savefig(filename, dpi=dpi)
 
 
-def save_4_4_tensor(filename, tensor_name,  coords, tensor, description, suptitle, true_G): 
+
+def save_4_4_tensor_plot(filename, tensor_name,  coords, tensor, description, suptitle, true_G): 
 
     r = coords[:,1] * 1e2
 
@@ -145,7 +101,6 @@ def save_4_4_tensor(filename, tensor_name,  coords, tensor, description, suptitl
         for j, coord_name_2 in enumerate(coord_names):
 
             plt.subplot(4,4, 4*i + j + 1)
-#            plt.title(description + r' $' + tensor_name + '_{' + coord_name_1 + coord_name_2 +  r'}$', fontsize=title_font_size, y=1.08)
             plt.xlabel(r'$r$ (m)', fontsize=axis_font_size)
             plt.ylabel(r' $' + tensor_name + r'^{' + coord_name_1 + coord_name_2 +  r'}$ ($m^{-2}$)', fontsize=axis_font_size)
 
@@ -157,5 +112,32 @@ def save_4_4_tensor(filename, tensor_name,  coords, tensor, description, suptitl
     plt.gcf().set_size_inches(20, 20)
     plt.gcf().tight_layout(pad=2.0)
 
-    plt.savefig(filename+".jpg", dpi=dpi)
+    plt.savefig(filename, dpi=dpi)
 
+
+
+def save_fixed_point_plots(filename, history):
+
+
+    fixed_point_results = {key: value for key, value in history.history.items() if key not in { "loss", "PDE_loss", "BC_loss"} }
+
+    num_fp = len(fixed_point_results)
+
+    
+    plt.figure(1, (6.5 * num_fp,6))
+    plt.clf()
+
+
+    for i, (radius, fp_values) in enumerate(fixed_point_results.items()):
+
+        plt.subplot(1,num_fp + 1, i+1)
+        plt.title(f"r = {radius}")
+        plt.xlabel("Samples (x1000)")
+        plt.ylabel(r"$g_tr$")
+        plt.plot(fp_values)
+
+
+    plt.gcf().set_size_inches(6.1*num_fp, 6)
+    plt.gcf().tight_layout()
+    
+    plt.savefig(filename, dpi=dpi)

@@ -30,11 +30,6 @@ def transform_metric(output, from_model=False):
     else:
         return 1000 * (1 - output)
 
-#    if from_model:
-#        return tf.math.log(output) 
-#    else:
-#        return tf.math.exp(output) 
-
 
 
 def T(coords, batch_size):
@@ -301,20 +296,14 @@ def test_metric_log_g_rr(model, test_sample_cnt):
 
     data_visualisation.save_grr_plot(timestamp_filename("g_rr.jpg","/data/www.astro/2312403d/figs/"), coords, results, true_metric)
 
-#    data_visualisation.save_4_4_tensor(timestamp_filename("full_g_sigmoid"),"g", coords, results, "Network Predicted")
-#    data_visualisation.save_4_4_tensor("/data/www.astro/2312403d/figs/full_true_g","g", coords, true_metric, "Analytical")
-
-
-    
-
     trueset_G = 8 * math.pi * T(coords, test_sample_cnt)
 
 
     einstein_tensor_predict = get_einstein_tensor_from_g(model, test_sample_cnt, True)
-    data_visualisation.save_4_4_tensor(timestamp_filename("full_G_sigmoid"),"G", coords, einstein_tensor_predict, "", "PINN Einstein Tensor Prediction", trueset_G)
+    data_visualisation.save_4_4_tensor_plot(timestamp_filename("full_G_sigmoid,jpg"),"G", coords, einstein_tensor_predict, "", "PINN Einstein Tensor Prediction", trueset_G)
 
     einstein_tensor_true = get_einstein_tensor_from_g(model, test_sample_cnt, False)
-    data_visualisation.save_4_4_tensor("/data/www.astro/2312403d/figs/full_true_G","G", coords, einstein_tensor_true, "", "Einstein Tensor Found From Analytical Metric", trueset_G)
+    data_visualisation.save_4_4_tensor_plot("/data/www.astro/2312403d/figs/full_true_G.jpg","G", coords, einstein_tensor_true, "", "Einstein Tensor Found From Analytical Metric", trueset_G)
 
 
 
