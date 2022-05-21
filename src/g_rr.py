@@ -54,5 +54,5 @@ callback = EaseInPDELoss(model)
 
 history = model.fit(placeholder_coords, y, batch_size=batch_size, epochs=10, callbacks=[callback])
 
-testing.test_metric_log_g_rr(model, 5000)
+testing.test_models_metric_prediction(model, 5000)
 

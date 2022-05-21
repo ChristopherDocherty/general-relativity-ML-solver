@@ -9,6 +9,11 @@ from utils import analytic_functions, utils
 
 
 def get_einstein_tensor_from_g(model, batch_size, use_model):
+    '''
+        Builds the Einstein tensor for a given metric.
+
+        Can handle analytic metrics or metrics from trained models
+    '''
 
     with tf.GradientTape() as t2:
         with tf.GradientTape() as t1:
@@ -77,7 +82,11 @@ def get_einstein_tensor_from_g(model, batch_size, use_model):
 
 
 
-def test_metric_log_g_rr(model, test_sample_cnt): 
+def test_models_metric_prediction(model, test_sample_cnt): 
+    '''
+        Plots the predicted g_rr metric element and associated Einstein tensor from a 
+        trained model as a function of radius for fixed t, \phi and \\theta.
+    '''
 
 
     fixed_dict = {
@@ -86,6 +95,7 @@ def test_metric_log_g_rr(model, test_sample_cnt):
             'th': True,
             'phi': True 
             }
+
     coords = utils.get_coords(size = test_sample_cnt, fixed_dict=fixed_dict, plotting=True) 
         
     true_metric = analytic_functions.get_true_metric(coords) 
