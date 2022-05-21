@@ -5,7 +5,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import tensorflow as tf
 import numpy as np
 
-from utils import EE_utils, analytic_functions, utils
+from utils import analytic_functions, utils
 
 
 
@@ -30,7 +30,6 @@ class PINN_g_rr(tf.keras.Model):
 
 
         BC_radii = [4e-2, 11e-2] 
-        split_BC_radii = []
 
         t = np.reshape(np.random.random(batch_size),(-1,1))
         th = np.reshape(np.random.random(batch_size),(-1,1))
@@ -54,7 +53,7 @@ class PINN_g_rr(tf.keras.Model):
 
         
         g_rr = tf.concat(g_rr,0)
-        g_rr_true= [ tf.expand_dims(EE_utils.transform_metric(x, False), 1) for x in g_rr_true]
+        g_rr_true= [ tf.expand_dims(utils.transform_metric(x, False), 1) for x in g_rr_true]
         g_rr_true = tf.concat(g_rr_true, 0)
 
         return tf.math.reduce_mean(tf.math.square(g_rr - g_rr_true)) 
@@ -79,7 +78,7 @@ class PINN_g_rr(tf.keras.Model):
                         'phi': False                        
                         }
         
-                coords = EE_utils.get_split_coords(size=batch_size, fixed_dict=fixed_dict, plotting=False) 
+                coords = utils.get_coords_avoiding_discontinuity(size=batch_size, fixed_dict=fixed_dict, plotting=False) 
                 
                 t1.watch(coords)
                 t2.watch(coords)
@@ -88,7 +87,7 @@ class PINN_g_rr(tf.keras.Model):
         
                 g_linear = self(coords)
 
-                g_linear = EE_utils.transform_metric(g_linear, True)
+                g_linear = utils.transform_metric(g_linear, True)
         
                 g = analytic_functions.build_g_from_g_rr(g_linear, coords)
         
@@ -110,7 +109,7 @@ class PINN_g_rr(tf.keras.Model):
 
             return tf.math.reduce_mean(tf.math.square(christoffel_tensor - true_christoffel_tensor))
 
-        christoffel_grads = t2.batch_jacobian(christoffel_tensor,coords) * EE_utils.get_scaling_factor_correction_tensor((batch_size,dims,dims,dims,1))
+        christoffel_grads = t2.batch_jacobian(christoffel_tensor,coords) * utils.get_scaling_factor_correction_tensor((batch_size,dims,dims,dims,1))
 
         
         
@@ -121,7 +120,7 @@ class PINN_g_rr(tf.keras.Model):
             - christoffel_grads
             ) 
         
-#        true_reimann_tensor = EE_utils.get_analytical_reimann(coords, batch_size, dims)
+#        true_reimann_tensor = utils.get_analytical_reimann(coords, batch_size, dims)
 #
 #
 #        return tf.math.reduce_mean(tf.math.square(reimann_tensor - true_reimann_tensor))
@@ -134,10 +133,10 @@ class PINN_g_rr(tf.keras.Model):
         contr_ricci_tensor = tf.einsum('aiy,ajz,ayz->aij',g_inv, g_inv, ricci_tensor)
 
         
-        einstein_tensor = EE_utils.get_einstein_tensor(contr_ricci_tensor, g_inv, ricci_scalar, dims)
+        einstein_tensor = analytic_functions.get_einstein_tensor(contr_ricci_tensor, g_inv, ricci_scalar, dims)
 
         
-        EE_loss = tf.math.reduce_mean(tf.math.square(einstein_tensor - 8*np.pi*EE_utils.T(coords,batch_size)))
+        EE_loss = tf.math.reduce_mean(tf.math.square(einstein_tensor - 8*np.pi*utils.T(coords,batch_size)))
 
         
         return EE_loss

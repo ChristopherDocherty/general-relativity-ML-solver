@@ -23,3 +23,7 @@ R_sol = 7
 
 
 rho = M_sol/(4/3 * math.pi * R_sol**3)
+
+
+split_half_width = 5e-3
+

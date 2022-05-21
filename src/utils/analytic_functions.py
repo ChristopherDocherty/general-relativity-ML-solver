@@ -1,6 +1,5 @@
 import tensorflow as tf
 import numpy as np
-import datetime
 import math
 
 
@@ -10,7 +9,8 @@ import utils.utils as utils
 
 def T(coords, batch_size):
     '''
-    come back and simplify this spaghetti code
+    Returns the energy-momentum tensor for a static star at each set of coords
+    with the correct dimesnions to match a batch of training data
     '''
 
     inside_mask_tensor = utils.get_mask_function(inside=True, r=coords[:,1])
@@ -32,6 +32,12 @@ def T(coords, batch_size):
 
 
 def build_g_from_g_rr(g_rr, coords):
+    '''
+        Takes a tensor containing values of the g_rr metric element and returns 
+        the full set of metric elements at the given set of coords.
+
+        THis funciton supplies the analytical solutions for all other elements.
+    ''' 
 
     inside_mask_tensor = utils.get_mask_function(inside=True, r=coords[:,1])
     outside_mask_tensor = utils.get_mask_function(inside=False, r=coords[:,1]) 
@@ -71,13 +77,19 @@ def build_g_from_g_rr(g_rr, coords):
  
     return tf.concat([g_t, g_r, g_th, g_p],1)
 
-def get_true_metric(coords):
 
-#    return get_sliced_true_metric(coords)
+def get_true_metric(coords):
+    '''
+        Returns a tensor containing the value of all elements of the true metric
+        for each set of coordinates in coords.
+
+        This is physically valid inside and outside of the star
+    '''
+
     
     inside_mask_tensor = utils.get_mask_function(inside=True, r=coords[:,1])
     outside_mask_tensor = utils.get_mask_function(inside=False, r=coords[:,1]) 
-    g_rr_inside = 1 / (1 - 8/3 * math.pi * (coords[:,1] * scaling_factors[1])**2 * rho)
+    g_rr_inside = 1 / (1 - 8/3 * np.pi * (coords[:,1] * scaling_factors[1])**2 * rho)
     g_rr_outside = 1 / (1 -2*M_sol / (coords[:,1] * scaling_factors[1])) 
 
 
@@ -89,7 +101,8 @@ def get_true_metric(coords):
 
 def get_spherical_minkowski_metric(coords):
     '''
-        scaling_factors: holds the scaling factors implicit for each of the input coordinates
+        Returns a tensor containing the value of all elements of the spherical Minkowski metric
+        for each set of coordinates in coords
 
     '''
     g_thth = tf.expand_dims((coords[:,1] * scaling_factors[1]) **2, 1)
@@ -117,6 +130,13 @@ def get_spherical_minkowski_metric(coords):
 
 
 def get_schwarzchild_metric(coords):
+    '''
+        Returns a tensor containing the value of all elements of the Schwarzchild metric
+        for each set of coordinates in coords
+
+
+        Only physically meaningful outside the star's radius
+    '''
     
     r = coords[:,1] * scaling_factors[1]
     th = coords[:,2] * scaling_factors[2]
@@ -145,6 +165,24 @@ def get_schwarzchild_metric(coords):
 
 
 
+
+
+def get_einstein_tensor(contr_ricci_tensor, g_inv, ricci_scalar, dims):
+
+    ricci_scalar = tf.expand_dims(ricci_scalar, -1)
+    ricci_scalar = tf.expand_dims(ricci_scalar, -1)
+    ricci_scalar = tf.repeat(ricci_scalar,[dims],1)
+    ricci_scalar = tf.repeat(ricci_scalar,[dims],2)
+
+
+    return contr_ricci_tensor - 0.5 * ricci_scalar * g_inv 
+
+
+
+
+
+
+
 def get_true_metric_grads(coords, batch_size, dims):
 
 
@@ -161,7 +199,7 @@ def get_true_metric_grads(coords, batch_size, dims):
 
 def get_analytical_christoffel(coords):
 
-    c = 8/3 * math.pi * rho
+    c = 8/3 * np.pi * rho
     b = 3/2 * math.sqrt(1- 2 * M_sol / R_sol)
     r_s = 2*M_sol
 
@@ -196,24 +234,12 @@ def get_analytical_christoffel(coords):
               
     c_thpp = tf.expand_dims(  -tf.math.sin(theta) * tf.math.cos(theta), 1)
               
- #   c_ttr = tf.expand_dims( 
- #       ins *( ( b*c*r / tf.math.sqrt(1 - c*r**2) - 0.5*c*r) / (2*b - tf.math.sqrt(1 - c*r**2)))
- #       + out * r_s / ( 2* r * (r - r_s))
- #       , 1)
-
-#    c_ttr = tf.expand_dims( ins * c*r / ( 2 * tf.math.sqrt(1 - c*r**2)) ,1)
 
     c_ttr = tf.expand_dims( ins * 
                 0.5 * 
                 (c*r/tf.math.sqrt(1 - c*r**2)) *
                 1/(b - 0.5 * tf.math.sqrt(1 - c*r**2))
             , 1)
-
-#    c_ttr = tf.expand_dims(
-#                ins * c/2 * 1/( (b-0.5*tf.math.sqrt(1 - c*r**2)) * (1 - c*r**2) ) 
-#                * (c*r**2/(2*(b-0.5*tf.math.sqrt(1 - c*r**2)) + 1/tf.math.sqrt(1-c*r**2)))
-#            ,1)
-
 
 
     c_ththr = tf.expand_dims( 1/r, 1)
@@ -286,21 +312,14 @@ def get_analytical_reimann(coords,batch_size, dims):
 
         grads = t1.batch_jacobian(g, coords) * utils.get_scaling_factor_correction_tensor((batch_size,dims,dims,1))
 
-
-
-        
-    
         christoffel_tensor = 0.5 * (
             tf.einsum('ail,aklj->aikj', g_inv, grads) 
             + tf.einsum('ail,ajlk->aikj', g_inv, grads) 
             - tf.einsum('ail,ajkl->aikj', g_inv, grads)
         )
 
-
-
     christoffel_grads = t2.batch_jacobian(christoffel_tensor,coords) * utils.get_scaling_factor_correction_tensor((batch_size,dims,dims,dims,1))
 
-    
     
     reimann_tensor = (
         tf.einsum('amil,akmj->akijl',christoffel_tensor, christoffel_tensor)
