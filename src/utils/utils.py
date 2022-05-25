@@ -113,6 +113,8 @@ def get_coords_avoiding_discontinuity(size, fixed_dict, plotting):
     Fixed_dict: determines which cooridnates will cover a range of value or take just one value
 
     plotting: determines whether linspace is used (in order for plotting) or random (for training)
+
+    Choices about radii and other coordinate values are hard coded and must be changed manually.
     '''
 
     rescaled_R_sol = R_sol / scaling_factors[1]

@@ -11,7 +11,7 @@ loss_tracker = tf.keras.metrics.Mean(name="myLoss")
 
 
 
-class EinsteinTensorPINN(tf.keras.Model):
+class ReimannTensorPINN(tf.keras.Model):
     '''
         Physics informed neural network (PINN) implemented with a custom loss function
         that represents how well Einstein's field equations are satsified by the 
@@ -71,11 +71,11 @@ class EinsteinTensorPINN(tf.keras.Model):
             metric tensor is built using the analytical values for the other elements
             at each set of coordinates.
 
-            This is then passed through a pipeline that find teh Einstein tensor 
+            This is then passed through a pipeline that find Reimann tensor
             associated with that metric.
-           
-            Returns the mean squared error of the model's prediction of the Einstein tensor 
-            and 8\pi times the energy momentum tensor for the system of interest.
+
+            The mean squared error of this predicted Reimann tensor as compared
+            to the analytical Reimann tensor is returned.
         '''
 
     
@@ -108,12 +108,15 @@ class EinsteinTensorPINN(tf.keras.Model):
             g_inv = tf.linalg.inv(g)
 
             grads = t1.batch_jacobian(g, coords) * utils.get_scaling_factor_correction_tensor((batch_size,dims,dims,1))
+
+
         
             christoffel_tensor = 0.5 * (
                 tf.einsum('ail,aklj->aikj', g_inv, grads) 
                 + tf.einsum('ail,ajlk->aikj', g_inv, grads) 
                 - tf.einsum('ail,ajkl->aikj', g_inv, grads)
             )
+
 
         christoffel_grads = t2.batch_jacobian(christoffel_tensor,coords) * utils.get_scaling_factor_correction_tensor((batch_size,dims,dims,dims,1))
 
@@ -123,21 +126,10 @@ class EinsteinTensorPINN(tf.keras.Model):
             + tf.einsum('aijkl->aijlk', christoffel_grads)
             - christoffel_grads
             ) 
-
-        ricci_tensor = tf.einsum('aijik', reimann_tensor)
         
-        ricci_scalar = tf.einsum('aij,aij->a',g_inv, ricci_tensor)
+        true_reimann_tensor = utils.get_analytical_reimann(coords, batch_size, dims)
 
-        contr_ricci_tensor = tf.einsum('aiy,ajz,ayz->aij',g_inv, g_inv, ricci_tensor)
-
-        
-        einstein_tensor = analytic_functions.get_einstein_tensor(contr_ricci_tensor, g_inv, ricci_scalar, dims)
-
-        
-        EE_loss = tf.math.reduce_mean(tf.math.square(einstein_tensor - 8*np.pi*analytic_functions.T(coords,batch_size)))
-
-        
-        return EE_loss
+        return tf.math.reduce_mean(tf.math.square(reimann_tensor - true_reimann_tensor))
 
 
 

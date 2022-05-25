@@ -11,7 +11,7 @@ loss_tracker = tf.keras.metrics.Mean(name="myLoss")
 
 
 
-class EinsteinTensorPINN(tf.keras.Model):
+class MetricTensorPINN(tf.keras.Model):
     '''
         Physics informed neural network (PINN) implemented with a custom loss function
         that represents how well Einstein's field equations are satsified by the 
@@ -71,73 +71,34 @@ class EinsteinTensorPINN(tf.keras.Model):
             metric tensor is built using the analytical values for the other elements
             at each set of coordinates.
 
-            This is then passed through a pipeline that find teh Einstein tensor 
+            This is then passed through a pipeline that finds metric tensor
             associated with that metric.
-           
-            Returns the mean squared error of the model's prediction of the Einstein tensor 
-            and 8\pi times the energy momentum tensor for the system of interest.
+
+            The mean squared error of this predicted metric tensor as compared
+            to the analytical metric tensor is returned.
         '''
 
     
-        with tf.GradientTape() as t2:
-            with tf.GradientTape() as t1:
-        
 
-                fixed_dict = {
-                        't': False,
-                        'r': False,
-                        'th': False,
-                        'phi': False                        
-                        }
-        
-                coords = utils.get_coords_avoiding_discontinuity(size=batch_size, fixed_dict=fixed_dict, plotting=False) 
-                
-                t1.watch(coords)
-                t2.watch(coords)
-        
-        
-        
-                g_linear = self(coords)
+        fixed_dict = {
+                't': False,
+                'r': False,
+                'th': False,
+                'phi': False                        
+                }
 
-                g_linear = utils.transform_metric(g_linear, True)
-        
-                g = analytic_functions.build_g_from_g_rr(g_linear, coords)
-        
-        
-        
-            g_inv = tf.linalg.inv(g)
+        coords = utils.get_coords_avoiding_discontinuity(size=batch_size, fixed_dict=fixed_dict, plotting=False) 
 
-            grads = t1.batch_jacobian(g, coords) * utils.get_scaling_factor_correction_tensor((batch_size,dims,dims,1))
-        
-            christoffel_tensor = 0.5 * (
-                tf.einsum('ail,aklj->aikj', g_inv, grads) 
-                + tf.einsum('ail,ajlk->aikj', g_inv, grads) 
-                - tf.einsum('ail,ajkl->aikj', g_inv, grads)
-            )
+        g_linear = self(coords)
 
-        christoffel_grads = t2.batch_jacobian(christoffel_tensor,coords) * utils.get_scaling_factor_correction_tensor((batch_size,dims,dims,dims,1))
+        g_linear = utils.transform_metric(g_linear, True)
 
-        reimann_tensor = (
-            tf.einsum('amil,akmj->akijl',christoffel_tensor, christoffel_tensor)
-            - tf.einsum('amij,akml->akijl',christoffel_tensor, christoffel_tensor)
-            + tf.einsum('aijkl->aijlk', christoffel_grads)
-            - christoffel_grads
-            ) 
+        g = analytic_functions.build_g_from_g_rr(g_linear, coords)
 
-        ricci_tensor = tf.einsum('aijik', reimann_tensor)
-        
-        ricci_scalar = tf.einsum('aij,aij->a',g_inv, ricci_tensor)
+        true_g = analytic_functions.get_true_metric(coords)
 
-        contr_ricci_tensor = tf.einsum('aiy,ajz,ayz->aij',g_inv, g_inv, ricci_tensor)
 
-        
-        einstein_tensor = analytic_functions.get_einstein_tensor(contr_ricci_tensor, g_inv, ricci_scalar, dims)
-
-        
-        EE_loss = tf.math.reduce_mean(tf.math.square(einstein_tensor - 8*np.pi*analytic_functions.T(coords,batch_size)))
-
-        
-        return EE_loss
+        return tf.math.reduce_mean(tf.math.square(g - true_g))
 
 
 

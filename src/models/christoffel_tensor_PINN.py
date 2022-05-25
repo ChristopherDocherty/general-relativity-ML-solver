@@ -11,11 +11,11 @@ loss_tracker = tf.keras.metrics.Mean(name="myLoss")
 
 
 
-class EinsteinTensorPINN(tf.keras.Model):
+class ChristoffelTensorPINN(tf.keras.Model):
     '''
         Physics informed neural network (PINN) implemented with a custom loss function
         that represents how well Einstein's field equations are satsified by the 
-        network prediction of the g_rr metric element. This onvolves satisfying 
+        network prediction of the g_rr metric element. This involves satisfying 
         the PDE as well as boundary conditions that are set in this class
 
         Calling this model on a set of 4-dimensional coordinates will give the
@@ -71,11 +71,12 @@ class EinsteinTensorPINN(tf.keras.Model):
             metric tensor is built using the analytical values for the other elements
             at each set of coordinates.
 
-            This is then passed through a pipeline that find teh Einstein tensor 
+            This is then passed through a pipeline that find Christoffel tensor
             associated with that metric.
+
+            The mean squared error of this predicted Christoffel tensor as compared
+            to the analytical Christoffel tensor is returned.
            
-            Returns the mean squared error of the model's prediction of the Einstein tensor 
-            and 8\pi times the energy momentum tensor for the system of interest.
         '''
 
     
@@ -108,6 +109,8 @@ class EinsteinTensorPINN(tf.keras.Model):
             g_inv = tf.linalg.inv(g)
 
             grads = t1.batch_jacobian(g, coords) * utils.get_scaling_factor_correction_tensor((batch_size,dims,dims,1))
+
+
         
             christoffel_tensor = 0.5 * (
                 tf.einsum('ail,aklj->aikj', g_inv, grads) 
@@ -115,29 +118,10 @@ class EinsteinTensorPINN(tf.keras.Model):
                 - tf.einsum('ail,ajkl->aikj', g_inv, grads)
             )
 
-        christoffel_grads = t2.batch_jacobian(christoffel_tensor,coords) * utils.get_scaling_factor_correction_tensor((batch_size,dims,dims,dims,1))
+            true_christoffel_tensor = analytic_functions.get_analytical_christoffel(coords)
 
-        reimann_tensor = (
-            tf.einsum('amil,akmj->akijl',christoffel_tensor, christoffel_tensor)
-            - tf.einsum('amij,akml->akijl',christoffel_tensor, christoffel_tensor)
-            + tf.einsum('aijkl->aijlk', christoffel_grads)
-            - christoffel_grads
-            ) 
+            return tf.math.reduce_mean(tf.math.square(christoffel_tensor - true_christoffel_tensor))
 
-        ricci_tensor = tf.einsum('aijik', reimann_tensor)
-        
-        ricci_scalar = tf.einsum('aij,aij->a',g_inv, ricci_tensor)
-
-        contr_ricci_tensor = tf.einsum('aiy,ajz,ayz->aij',g_inv, g_inv, ricci_tensor)
-
-        
-        einstein_tensor = analytic_functions.get_einstein_tensor(contr_ricci_tensor, g_inv, ricci_scalar, dims)
-
-        
-        EE_loss = tf.math.reduce_mean(tf.math.square(einstein_tensor - 8*np.pi*analytic_functions.T(coords,batch_size)))
-
-        
-        return EE_loss
 
 
 

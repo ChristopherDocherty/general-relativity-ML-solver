@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 
 
-from visualisation import data_visualisation
+from visualisation import visualise
 
 from utils.constants import scaling_factors, M_sol, R_sol, rho
 from utils import analytic_functions, utils
@@ -105,14 +105,14 @@ def test_models_metric_prediction(model, test_sample_cnt):
     results = analytic_functions.build_g_from_g_rr(results, coords)
 
 
-    data_visualisation.save_grr_plot(utils.timestamp_filename("g_rr.jpg","/data/www.astro/2312403d/figs/"), coords, results, true_metric)
+    visualise.save_grr_plot(utils.timestamp_filename("g_rr.jpg","/data/www.astro/2312403d/figs/"), coords, results, true_metric)
 
     trueset_G = 8 * np.pi * analytic_functions.T(coords, test_sample_cnt)
 
 
     einstein_tensor_predict = get_einstein_tensor_from_g(model, test_sample_cnt, True)
-    data_visualisation.save_4_4_tensor_plot(utils.timestamp_filename("full_G_sigmoid,jpg"),"G", coords, einstein_tensor_predict, "", "PINN Einstein Tensor Prediction", trueset_G)
+    visualise.save_4_4_tensor_plot(utils.timestamp_filename("full_G_sigmoid,jpg"),"G", coords, einstein_tensor_predict, "", "PINN Einstein Tensor Prediction", trueset_G)
 
     einstein_tensor_true = get_einstein_tensor_from_g(model, test_sample_cnt, False)
-    data_visualisation.save_4_4_tensor_plot("/data/www.astro/2312403d/figs/full_true_G.jpg","G", coords, einstein_tensor_true, "", "Einstein Tensor Found From Analytical Metric", trueset_G)
+    visualise.save_4_4_tensor_plot("/data/www.astro/2312403d/figs/full_true_G.jpg","G", coords, einstein_tensor_true, "", "Einstein Tensor Found From Analytical Metric", trueset_G)
 
