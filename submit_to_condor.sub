@@ -1,0 +1,28 @@
+#Provide directories to save the files created by condor in
+universe = vanilla
+log = /home/$(Cluster).$(Process).log
+error = /home/$(Cluster).$(Process).err
+output = /home/$(Cluster).$(Process).out
+
+# Fill in with your own script, arguments and input files
+# Note that you don't need to transfer any software
+executable = /home/condor_script.sh 
+arguments = /home/train_and_test_PINN.py 
+transfer_input_files =
+
+
+# Resource requirements
+request_cpus = 1
+request_gpus = 1
+request_memory = 2GB
+request_disk = 4GB
+
+#To get an email notification when your condor job finishes
+#replace the sample with your email 
+notify_user = sample@gmail.com 
+notification = Always
+
+# Number of jobs
+queue 1
+
+
