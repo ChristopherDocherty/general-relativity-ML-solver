@@ -41,7 +41,7 @@ def get_scaling_factor_correction_tensor(shape):
 
 
 
-def timestamp_filename(f_str,path="/data/www.astro/2312403d/figs/"):
+def timestamp_filename(f_str,path="/put_default_path_here/"):
     '''
         Used to timestamp filenames so that multiple runs of data can be saved without overwriting
     '''

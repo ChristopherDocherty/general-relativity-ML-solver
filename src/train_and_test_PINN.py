@@ -52,7 +52,7 @@ callback = EaseInPDELoss(model)
 
 history = model.fit(placeholder_coords, y, batch_size=batch_size, epochs=10, callbacks=[callback])
 
-visualise.save_losses_plot(utils.timestamp_filename("losses.jpg","/data/www.astro/2312403d/figs/"), history)
+visualise.save_losses_plot(utils.timestamp_filename("losses.jpg","/your_dir_here/"), history)
 
 testing.test_models_metric_prediction(model, 5000)
 

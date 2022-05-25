@@ -105,7 +105,7 @@ def test_models_metric_prediction(model, test_sample_cnt):
     results = analytic_functions.build_g_from_g_rr(results, coords)
 
 
-    visualise.save_grr_plot(utils.timestamp_filename("g_rr.jpg","/data/www.astro/2312403d/figs/"), coords, results, true_metric)
+    visualise.save_grr_plot(utils.timestamp_filename("g_rr.jpg","/put_dir_to_save_in_here/"), coords, results, true_metric)
 
     trueset_G = 8 * np.pi * analytic_functions.T(coords, test_sample_cnt)
 
@@ -114,5 +114,5 @@ def test_models_metric_prediction(model, test_sample_cnt):
     visualise.save_4_4_tensor_plot(utils.timestamp_filename("full_G_sigmoid,jpg"),"G", coords, einstein_tensor_predict, "", "PINN Einstein Tensor Prediction", trueset_G)
 
     einstein_tensor_true = get_einstein_tensor_from_g(model, test_sample_cnt, False)
-    visualise.save_4_4_tensor_plot("/data/www.astro/2312403d/figs/full_true_G.jpg","G", coords, einstein_tensor_true, "", "Einstein Tensor Found From Analytical Metric", trueset_G)
+    visualise.save_4_4_tensor_plot("/put_your_dir_here/full_true_G.jpg","G", coords, einstein_tensor_true, "", "Einstein Tensor Found From Analytical Metric", trueset_G)
 
